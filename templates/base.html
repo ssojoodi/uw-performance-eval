@@ -1,14 +1,21 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}UW Performance Eval{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'app/styles.css' %}">
   </head>
   <body>
+    <header class="site-header">
+      <a class="brand" href="{% url 'dashboard' %}">UW Eval</a>
+      {% if request.user.is_authenticated %}
+        <span class="user">{{ request.user.get_username }}</span>
+      {% endif %}
+    </header>
     <main>
       {% block content %}{% endblock %}
     </main>
   </body>
 </html>
-

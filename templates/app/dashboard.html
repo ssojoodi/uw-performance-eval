@@ -3,41 +3,48 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-  <h1>Manager Todo</h1>
+  <section class="page-head">
+    <p class="eyebrow">Manager workspace</p>
+    <h1>Evaluation todo</h1>
+  </section>
 
   {% if todo_items %}
-    <table>
-      <thead>
-        <tr>
-          <th>Employee</th>
-          <th>Email</th>
-          <th>Latest evaluation</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in todo_items %}
+    <section class="panel">
+      <table>
+        <thead>
           <tr>
-            <td>{{ item.employee.name }}</td>
-            <td>{{ item.employee.email|default:"-" }}</td>
-            <td>
-              {% if item.latest_evaluation %}
-                {{ item.latest_evaluation.get_state_display }}
-              {% else %}
-                Not started
-              {% endif %}
-            </td>
-            <td>
-              <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
-                {% csrf_token %}
-                <button type="submit">Start new eval</button>
-              </form>
-            </td>
+            <th>Employee</th>
+            <th>Email</th>
+            <th>Latest evaluation</th>
+            <th>Action</th>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {% for item in todo_items %}
+            <tr>
+              <td><strong>{{ item.employee.name }}</strong></td>
+              <td>{{ item.employee.email|default:"-" }}</td>
+              <td>
+                {% if item.latest_evaluation %}
+                  <span class="status">{{ item.latest_evaluation.get_state_display }}</span>
+                {% else %}
+                  <span class="status muted">Not started</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
+                  {% csrf_token %}
+                  <button type="submit">Start new eval</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
   {% else %}
-    <p>No assigned employees.</p>
+    <section class="panel empty">
+      <p>No assigned employees.</p>
+    </section>
   {% endif %}
 {% endblock %}
