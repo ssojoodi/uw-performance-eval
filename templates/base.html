@@ -11,7 +11,13 @@
     <header class="site-header">
       <a class="brand" href="{% url 'dashboard' %}">UW Eval</a>
       {% if request.user.is_authenticated %}
-        <span class="user">{{ request.user.get_username }}</span>
+        <nav class="user-nav">
+          <span class="user-pill">{{ request.user.get_username }}</span>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="link-button">Log out</button>
+          </form>
+        </nav>
       {% endif %}
     </header>
     <main>

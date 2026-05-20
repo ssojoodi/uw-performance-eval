@@ -32,6 +32,27 @@ main {
   color: var(--muted);
 }
 
+.user-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  padding: 4px;
+}
+
+.user-nav form {
+  margin: 0;
+}
+
+.user-pill {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 10px;
+}
+
 .brand,
 .button-link {
   color: var(--text);
@@ -97,8 +118,7 @@ tr:last-child td { border-bottom: 0; }
 }
 
 .muted,
-.empty,
-.user { color: var(--muted); }
+.empty { color: var(--muted); }
 
 button,
 .button-link {
@@ -119,6 +139,19 @@ button:hover,
 button.secondary {
   background: transparent;
   color: var(--accent);
+}
+
+button.link-button {
+  background: transparent;
+  color: var(--accent);
+  border-color: transparent;
+  padding: 7px 10px;
+  font-size: 14px;
+}
+
+button.link-button:hover {
+  background: #1b1915;
+  filter: none;
 }
 
 input,

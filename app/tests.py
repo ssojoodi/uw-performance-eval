@@ -33,6 +33,25 @@ class BaseAppTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse("login"), response["Location"])
 
+    def test_authenticated_pages_show_logout_button(self):
+        user = self.create_manager()
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "Log out")
+
+    def test_logout_ends_session(self):
+        user = self.create_manager()
+        self.client.force_login(user)
+
+        response = self.client.post(reverse("logout"))
+
+        self.assertRedirects(response, reverse("login"))
+        response = self.client.get(reverse("dashboard"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("login"), response["Location"])
+
     def test_dashboard_renders_for_authenticated_user(self):
         user = self.create_manager(username="manager@example.com")
         self.client.force_login(user)
