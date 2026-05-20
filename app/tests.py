@@ -31,6 +31,63 @@ class BaseAppTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_dashboard_lists_only_active_assignments_for_user(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        other_manager = get_user_model().objects.create_user(username="other")
+        assigned_employee = Employee.objects.create(name="Assigned Employee")
+        inactive_employee = Employee.objects.create(
+            name="Inactive Employee",
+            is_active=False,
+        )
+        other_employee = Employee.objects.create(name="Other Employee")
+        ManagerAssignment.objects.create(
+            manager=manager,
+            employee=assigned_employee,
+        )
+        ManagerAssignment.objects.create(
+            manager=manager,
+            employee=inactive_employee,
+        )
+        ManagerAssignment.objects.create(
+            manager=other_manager,
+            employee=other_employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "Assigned Employee")
+        self.assertNotContains(response, "Inactive Employee")
+        self.assertNotContains(response, "Other Employee")
+
+    def test_start_evaluation_creates_draft_for_assigned_employee(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        ManagerAssignment.objects.create(manager=manager, employee=employee)
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("start_evaluation", args=[employee.id])
+        )
+
+        self.assertRedirects(response, reverse("dashboard"))
+        evaluation = Evaluation.objects.get()
+        self.assertEqual(evaluation.manager, manager)
+        self.assertEqual(evaluation.employee, employee)
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+
+    def test_start_evaluation_rejects_unassigned_employee(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Unassigned Employee")
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("start_evaluation", args=[employee.id])
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Evaluation.objects.exists())
+
 
 class DataModelTests(TestCase):
     def setUp(self):

@@ -3,6 +3,41 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-  <h1>UW Performance Evaluation Platform</h1>
-{% endblock %}
+  <h1>Manager Todo</h1>
 
+  {% if todo_items %}
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Email</th>
+          <th>Latest evaluation</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in todo_items %}
+          <tr>
+            <td>{{ item.employee.name }}</td>
+            <td>{{ item.employee.email|default:"-" }}</td>
+            <td>
+              {% if item.latest_evaluation %}
+                {{ item.latest_evaluation.get_state_display }}
+              {% else %}
+                Not started
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
+                {% csrf_token %}
+                <button type="submit">Start new eval</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No assigned employees.</p>
+  {% endif %}
+{% endblock %}

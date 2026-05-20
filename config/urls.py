@@ -14,6 +14,10 @@ urlpatterns = [
     ),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("health/", views.health, name="health"),
+    path(
+        "employees/<int:employee_id>/evaluations/start/",
+        views.start_evaluation,
+        name="start_evaluation",
+    ),
     path("", views.dashboard, name="dashboard"),
 ]
-
