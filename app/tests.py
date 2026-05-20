@@ -1,6 +1,9 @@
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
+
+from .models import Employee, Evaluation, ManagerAssignment
 
 
 class BaseAppTests(TestCase):
@@ -28,3 +31,77 @@ class BaseAppTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+
+class DataModelTests(TestCase):
+    def setUp(self):
+        self.manager = get_user_model().objects.create_user(
+            username="manager",
+            email="manager@example.com",
+            password="password",
+        )
+        self.reviewer = get_user_model().objects.create_user(
+            username="vp",
+            email="vp@example.com",
+            password="password",
+        )
+        self.employee = Employee.objects.create(
+            name="Taylor Student",
+            email="taylor@example.com",
+            student_id="12345678",
+        )
+
+    def test_manager_assignment_allows_only_one_active_pair(self):
+        ManagerAssignment.objects.create(
+            manager=self.manager,
+            employee=self.employee,
+        )
+
+        with self.assertRaises(IntegrityError):
+            ManagerAssignment.objects.create(
+                manager=self.manager,
+                employee=self.employee,
+            )
+
+    def test_inactive_assignment_can_be_recreated(self):
+        ManagerAssignment.objects.create(
+            manager=self.manager,
+            employee=self.employee,
+            is_active=False,
+        )
+
+        assignment = ManagerAssignment.objects.create(
+            manager=self.manager,
+            employee=self.employee,
+        )
+
+        self.assertTrue(assignment.is_active)
+
+    def test_evaluation_defaults_to_draft(self):
+        evaluation = Evaluation.objects.create(
+            manager=self.manager,
+            employee=self.employee,
+        )
+
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+        self.assertTrue(evaluation.is_editable)
+        self.assertEqual(evaluation.form_data, {})
+
+    def test_evaluation_metadata_helpers_update_state(self):
+        evaluation = Evaluation.objects.create(
+            manager=self.manager,
+            employee=self.employee,
+        )
+
+        evaluation.mark_submitted()
+        self.assertEqual(evaluation.state, Evaluation.State.IN_REVIEW)
+        self.assertIsNotNone(evaluation.submitted_at)
+
+        evaluation.mark_approved(self.reviewer)
+        self.assertEqual(evaluation.state, Evaluation.State.APPROVED)
+        self.assertEqual(evaluation.approved_by, self.reviewer)
+        self.assertIsNotNone(evaluation.approved_at)
+
+        evaluation.mark_returned(self.reviewer)
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+        self.assertEqual(evaluation.returned_by, self.reviewer)
+        self.assertIsNotNone(evaluation.returned_at)
