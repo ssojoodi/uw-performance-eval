@@ -60,7 +60,7 @@ class BaseAppTests(TestCase):
         self.assertNotContains(response, "Inactive Employee")
         self.assertNotContains(response, "Other Employee")
 
-    def test_start_evaluation_creates_draft_for_assigned_employee(self):
+    def test_start_evaluation_creates_draft_and_opens_form(self):
         manager = get_user_model().objects.create_user(username="manager")
         employee = Employee.objects.create(name="Assigned Employee")
         ManagerAssignment.objects.create(manager=manager, employee=employee)
@@ -70,8 +70,11 @@ class BaseAppTests(TestCase):
             reverse("start_evaluation", args=[employee.id])
         )
 
-        self.assertRedirects(response, reverse("dashboard"))
         evaluation = Evaluation.objects.get()
+        self.assertRedirects(
+            response,
+            reverse("edit_evaluation", args=[evaluation.id]),
+        )
         self.assertEqual(evaluation.manager, manager)
         self.assertEqual(evaluation.employee, employee)
         self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
@@ -87,6 +90,178 @@ class BaseAppTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertFalse(Evaluation.objects.exists())
+
+    def test_edit_evaluation_renders_form_for_own_draft(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("edit_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Assigned Employee")
+        self.assertContains(response, "Save as draft")
+        self.assertContains(response, "Submit for review")
+
+    def test_save_as_draft_persists_form_data(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("edit_evaluation", args=[evaluation.id]),
+            {
+                "pi_student": "Assigned Employee",
+                "pi_term": "Winter 2026",
+                "pi_job_title": "Software Developer",
+                "q_your_name": "Manager Person",
+                "q_strengths": ["Communication", "Collaboration"],
+                "q_strength_comments": "Communication and ownership.",
+                "q_developments": ["Critical thinking"],
+                "q_development_comments": "More production debugging reps.",
+                "q_overall_rating": "EXCELLENT",
+                "q_supervisor_comments": "Strong delivery.",
+                "q_supervisor_recommendations": "Ready for larger tasks.",
+                "q_reviewed_with_student": "Yes",
+                "q_return_next_term": "Yes",
+                "action": "save_draft",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("edit_evaluation", args=[evaluation.id]),
+        )
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+        self.assertEqual(evaluation.form_data["pi_term"], "Winter 2026")
+        self.assertEqual(evaluation.form_data["q_overall_rating"], "EXCELLENT")
+        self.assertEqual(
+            evaluation.form_data["q_strengths"],
+            ["Communication", "Collaboration"],
+        )
+
+    def test_submit_for_review_saves_data_and_transitions_state(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("edit_evaluation", args=[evaluation.id]),
+            {
+                "pi_student": "Assigned Employee",
+                "pi_term": "Winter 2026",
+                "pi_job_title": "Software Developer",
+                "q_strengths": ["Collaboration"],
+                "q_strength_comments": "Reliability.",
+                "q_developments": ["Critical thinking"],
+                "q_development_comments": "Testing depth.",
+                "q_overall_rating": "GOOD",
+                "q_supervisor_comments": "Consistent progress.",
+                "q_supervisor_recommendations": "Submitted for review.",
+                "q_reviewed_with_student": "Yes",
+                "q_return_next_term": "Undecided",
+                "action": "submit_for_review",
+            },
+        )
+
+        self.assertRedirects(response, reverse("dashboard"))
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.IN_REVIEW)
+        self.assertIsNotNone(evaluation.submitted_at)
+        self.assertEqual(
+            evaluation.form_data["q_supervisor_recommendations"],
+            "Submitted for review.",
+        )
+
+    def test_submit_for_review_requires_required_end_term_fields(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("edit_evaluation", args=[evaluation.id]),
+            {
+                "pi_student": "Assigned Employee",
+                "action": "submit_for_review",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required before submitting for review.")
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+
+    def test_save_as_draft_limits_strengths_to_three(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("edit_evaluation", args=[evaluation.id]),
+            {
+                "q_strengths": [
+                    "Communication",
+                    "Collaboration",
+                    "Critical thinking",
+                    "Implementation",
+                ],
+                "action": "save_draft",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select up to 3 options.")
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.form_data, {})
+
+    def test_edit_evaluation_rejects_other_manager(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        other_manager = get_user_model().objects.create_user(username="other")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=other_manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("edit_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_edit_evaluation_rejects_non_draft(self):
+        manager = get_user_model().objects.create_user(username="manager")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("edit_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 404)
 
 
 class DataModelTests(TestCase):

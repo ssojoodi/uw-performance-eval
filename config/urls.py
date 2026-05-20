@@ -19,5 +19,10 @@ urlpatterns = [
         views.start_evaluation,
         name="start_evaluation",
     ),
+    path(
+        "evaluations/<int:evaluation_id>/edit/",
+        views.edit_evaluation,
+        name="edit_evaluation",
+    ),
     path("", views.dashboard, name="dashboard"),
 ]

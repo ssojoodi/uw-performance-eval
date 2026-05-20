@@ -32,10 +32,14 @@
                 {% endif %}
               </td>
               <td>
-                <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
-                  {% csrf_token %}
-                  <button type="submit">Start new eval</button>
-                </form>
+                {% if item.latest_evaluation and item.latest_evaluation.is_editable %}
+                  <a class="button-link" href="{% url 'edit_evaluation' item.latest_evaluation.id %}">Continue eval</a>
+                {% else %}
+                  <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
+                    {% csrf_token %}
+                    <button type="submit">Start new eval</button>
+                  </form>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluation{% endblock %}
+
+{% block content %}
+  <section class="page-head">
+    <p class="eyebrow">UW end-of-term evaluation</p>
+    <h1>{{ evaluation.employee.name }}</h1>
+  </section>
+
+  <form method="post" class="eval-form">
+    {% csrf_token %}
+
+    {% for section in form.lead_field_sections %}
+      <section class="panel form-section">
+        <h2>{{ section.title }}</h2>
+        <div{% if section.class %} class="{{ section.class }}"{% endif %}>
+          {% for item in section.fields %}
+            {% include "app/field.html" with field=item.field hint=item.hint %}
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+
+    <section class="panel form-section">
+      <h2>Rating Details</h2>
+      {% for section in form.competency_sections %}
+        <div class="competency-group">
+          <h3>{{ section.title }}</h3>
+          <p class="hint">Student demonstrates the ability to:</p>
+          {% for item in section.items %}
+            <div class="rating-row">
+              <div class="rating-label">{{ item.label }}</div>
+              <div class="rating-options">
+                {% for option in item.options %}
+                  <label class="rating-option" for="{{ option.id }}">
+                    <input
+                      type="radio"
+                      name="{{ option.name }}"
+                      id="{{ option.id }}"
+                      value="{{ option.value }}"
+                      {% if option.checked %}checked{% endif %}
+                    >
+                    <span class="rating-card">
+                      <span class="rating-short">{{ option.short }}</span>
+                      <span class="rating-text">{{ option.text }}</span>
+                    </span>
+                  </label>
+                {% endfor %}
+              </div>
+              {% if item.field.errors %}
+                <div class="errors">{{ item.field.errors }}</div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </section>
+
+    {% for section in form.followup_field_sections %}
+      <section class="panel form-section">
+        <h2>{{ section.title }}</h2>
+        {% for item in section.fields %}
+          {% include "app/field.html" with field=item.field hint=item.hint %}
+        {% endfor %}
+      </section>
+    {% endfor %}
+
+    <div class="actions sticky-actions">
+      <button type="submit" name="action" value="save_draft" class="secondary">Save as draft</button>
+      <button type="submit" name="action" value="submit_for_review">Submit for review</button>
+    </div>
+  </form>
+{% endblock %}
