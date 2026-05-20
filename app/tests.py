@@ -1,12 +1,26 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
 from .models import Employee, Evaluation, ManagerAssignment
+from .roles import ROLE_MANAGER, ROLE_VP
 
 
 class BaseAppTests(TestCase):
+    def create_manager(self, username="manager"):
+        user = get_user_model().objects.create_user(username=username)
+        manager_group, _ = Group.objects.get_or_create(name=ROLE_MANAGER)
+        user.groups.add(manager_group)
+        return user
+
+    def create_vp(self, username="vp"):
+        user = get_user_model().objects.create_user(username=username)
+        vp_group, _ = Group.objects.get_or_create(name=ROLE_VP)
+        user.groups.add(vp_group)
+        return user
+
     def test_health_check_is_public(self):
         response = self.client.get(reverse("health"))
 
@@ -20,20 +34,45 @@ class BaseAppTests(TestCase):
         self.assertIn(reverse("login"), response["Location"])
 
     def test_dashboard_renders_for_authenticated_user(self):
-        user = get_user_model().objects.create_user(
-            username="manager@example.com",
-            email="manager@example.com",
-            password="password",
-        )
+        user = self.create_manager(username="manager@example.com")
         self.client.force_login(user)
 
         response = self.client.get(reverse("dashboard"))
 
         self.assertEqual(response.status_code, 200)
 
+    def test_dashboard_renders_for_vp_user(self):
+        user = self.create_vp()
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "VP workspace")
+
+    def test_dashboard_rejects_authenticated_user_without_role(self):
+        user = get_user_model().objects.create_user(username="employee")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_start_evaluation_rejects_vp_user(self):
+        vp = self.create_vp()
+        employee = Employee.objects.create(name="Assigned Employee")
+        self.client.force_login(vp)
+
+        response = self.client.post(
+            reverse("start_evaluation", args=[employee.id])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Evaluation.objects.exists())
+
     def test_dashboard_lists_only_active_assignments_for_user(self):
-        manager = get_user_model().objects.create_user(username="manager")
-        other_manager = get_user_model().objects.create_user(username="other")
+        manager = self.create_manager()
+        other_manager = self.create_manager(username="other")
         assigned_employee = Employee.objects.create(name="Assigned Employee")
         inactive_employee = Employee.objects.create(
             name="Inactive Employee",
@@ -61,7 +100,7 @@ class BaseAppTests(TestCase):
         self.assertNotContains(response, "Other Employee")
 
     def test_start_evaluation_creates_draft_and_opens_form(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         ManagerAssignment.objects.create(manager=manager, employee=employee)
         self.client.force_login(manager)
@@ -80,7 +119,7 @@ class BaseAppTests(TestCase):
         self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
 
     def test_start_evaluation_rejects_unassigned_employee(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Unassigned Employee")
         self.client.force_login(manager)
 
@@ -92,7 +131,7 @@ class BaseAppTests(TestCase):
         self.assertFalse(Evaluation.objects.exists())
 
     def test_edit_evaluation_renders_form_for_own_draft(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=manager,
@@ -108,7 +147,7 @@ class BaseAppTests(TestCase):
         self.assertContains(response, "Submit for review")
 
     def test_save_as_draft_persists_form_data(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=manager,
@@ -150,7 +189,7 @@ class BaseAppTests(TestCase):
         )
 
     def test_submit_for_review_saves_data_and_transitions_state(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=manager,
@@ -187,7 +226,7 @@ class BaseAppTests(TestCase):
         )
 
     def test_submit_for_review_requires_required_end_term_fields(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=manager,
@@ -209,7 +248,7 @@ class BaseAppTests(TestCase):
         self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
 
     def test_save_as_draft_limits_strengths_to_three(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=manager,
@@ -236,8 +275,8 @@ class BaseAppTests(TestCase):
         self.assertEqual(evaluation.form_data, {})
 
     def test_edit_evaluation_rejects_other_manager(self):
-        manager = get_user_model().objects.create_user(username="manager")
-        other_manager = get_user_model().objects.create_user(username="other")
+        manager = self.create_manager()
+        other_manager = self.create_manager(username="other")
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=other_manager,
@@ -250,7 +289,7 @@ class BaseAppTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_edit_evaluation_rejects_non_draft(self):
-        manager = get_user_model().objects.create_user(username="manager")
+        manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
         evaluation = Evaluation.objects.create(
             manager=manager,

@@ -35,8 +35,9 @@ Business roles:
 
 Django superusers are technical operators, not a product Admin role.
 
-Use Django `Group` records for roles. Each active product user must have exactly
-one business role.
+Use Django `Group` records for roles. The v1 group names are `VP`, `Manager`,
+and `Employee`. A user is treated as a Manager only when they belong to the
+`Manager` group. Each active product user must have exactly one business role.
 
 ## Authorization
 

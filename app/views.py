@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import EvaluationForm
 from .models import Evaluation, ManagerAssignment
+from .roles import is_manager, is_vp, manager_required
 
 
 def health(request):
@@ -12,6 +13,12 @@ def health(request):
 
 @login_required
 def dashboard(request):
+    if is_vp(request.user):
+        return render(request, "app/vp_dashboard.html")
+
+    if not is_manager(request.user):
+        return render(request, "app/no_role.html", status=403)
+
     assignments = (
         ManagerAssignment.objects.filter(
             manager=request.user,
@@ -38,6 +45,7 @@ def dashboard(request):
 
 
 @login_required
+@manager_required
 def start_evaluation(request, employee_id):
     if request.method != "POST":
         return redirect("dashboard")
@@ -58,6 +66,7 @@ def start_evaluation(request, employee_id):
 
 
 @login_required
+@manager_required
 def edit_evaluation(request, evaluation_id):
     evaluation = get_object_or_404(
         Evaluation.objects.select_related("employee", "manager"),
