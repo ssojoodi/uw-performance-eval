@@ -5,17 +5,22 @@
 {% block content %}
   <section class="page-head">
     <p class="eyebrow">Manager workspace</p>
-    <h1>Evaluation todo</h1>
+    <h1>Evaluations</h1>
   </section>
 
-  {% if todo_items %}
-    <section class="panel">
+  <section class="panel form-section">
+    <h2>My evaluations</h2>
+    {% include "app/evaluation_list.html" %}
+  </section>
+
+  <section class="panel form-section">
+    <h2>Assigned employees</h2>
+    {% if todo_items %}
       <table>
         <thead>
           <tr>
             <th>Employee</th>
             <th>Email</th>
-            <th>Latest evaluation</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -25,30 +30,17 @@
               <td><strong>{{ item.employee.name }}</strong></td>
               <td>{{ item.employee.email|default:"-" }}</td>
               <td>
-                {% if item.latest_evaluation %}
-                  <span class="status">{{ item.latest_evaluation.get_state_display }}</span>
-                {% else %}
-                  <span class="status muted">Not started</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if item.latest_evaluation and item.latest_evaluation.is_editable %}
-                  <a class="button-link" href="{% url 'edit_evaluation' item.latest_evaluation.id %}">Continue eval</a>
-                {% else %}
-                  <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
-                    {% csrf_token %}
-                    <button type="submit">Start new eval</button>
-                  </form>
-                {% endif %}
+                <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
+                  {% csrf_token %}
+                  <button type="submit">Start new eval</button>
+                </form>
               </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
-    </section>
-  {% else %}
-    <section class="panel empty">
-      <p>No assigned employees.</p>
-    </section>
-  {% endif %}
+    {% else %}
+      <p class="empty">No assigned employees.</p>
+    {% endif %}
+  </section>
 {% endblock %}

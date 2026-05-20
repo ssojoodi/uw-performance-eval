@@ -44,10 +44,10 @@ and `Employee`. A user is treated as a Manager only when they belong to the
 Enforce authorization in views, forms, and querysets, not only in templates.
 
 - All product routes require login.
-- Managers see only evaluations they created.
+- Managers see current and past evaluations they created.
 - Managers create evaluations only for assigned Employees.
 - Managers edit only their own `Draft` evaluations.
-- VPs see all evaluations.
+- VPs see evaluations awaiting review and finalized evaluations.
 - VPs cannot edit evaluation content.
 - Only VPs approve or return evaluations.
 - VPs cannot deactivate their own account.
@@ -90,12 +90,15 @@ States:
 Transitions:
 
 - Manager submits own `Draft`: `Draft` -> `In Review`.
+- Manager unlocks own `In Review`: `In Review` -> `Draft`.
 - VP returns `In Review`: `In Review` -> `Draft`.
 - VP approves `In Review`: `In Review` -> `Approved`.
 
-`Approved` evaluations are locked. Workflow state changes should go through
-explicit methods or service functions that validate actor role, current state,
-ownership, and timestamps.
+Managers may preview their own `In Review` evaluations but cannot edit them
+without unlocking them back to `Draft`. `Approved` evaluations are final. They
+remain visible as read-only records and cannot be unlocked, returned, or edited.
+Workflow state changes should go through explicit methods or service functions
+that validate actor role, current state, ownership, and timestamps.
 
 ## Import And Export
 

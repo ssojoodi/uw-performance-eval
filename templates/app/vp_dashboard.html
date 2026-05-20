@@ -5,10 +5,11 @@
 {% block content %}
   <section class="page-head">
     <p class="eyebrow">VP workspace</p>
-    <h1>Evaluation review</h1>
+    <h1>Evaluations</h1>
   </section>
 
-  <section class="panel empty">
-    <p>VP review tools are not built yet.</p>
+  <section class="panel form-section">
+    <h2>Review queue and history</h2>
+    {% include "app/evaluation_list.html" %}
   </section>
 {% endblock %}

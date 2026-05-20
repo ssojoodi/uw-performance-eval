@@ -69,6 +69,147 @@ class BaseAppTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "VP workspace")
 
+    def test_vp_dashboard_lists_in_review_and_approved_evaluations(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        in_review_employee = Employee.objects.create(name="Review Student")
+        approved_employee = Employee.objects.create(name="Approved Student")
+        draft_employee = Employee.objects.create(name="Draft Student")
+        Evaluation.objects.create(
+            manager=manager,
+            employee=in_review_employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        Evaluation.objects.create(
+            manager=manager,
+            employee=approved_employee,
+            state=Evaluation.State.APPROVED,
+        )
+        Evaluation.objects.create(
+            manager=manager,
+            employee=draft_employee,
+            state=Evaluation.State.DRAFT,
+        )
+        self.client.force_login(vp)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "Review Student")
+        self.assertContains(response, "Approved Student")
+        self.assertContains(response, "Review eval")
+        self.assertContains(response, "View eval")
+        self.assertNotContains(response, "Draft Student")
+
+    def test_vp_dashboard_is_paginated(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        for index in range(11):
+            employee = Employee.objects.create(name=f"Review Student {index:02d}")
+            Evaluation.objects.create(
+                manager=manager,
+                employee=employee,
+                state=Evaluation.State.IN_REVIEW,
+            )
+        self.client.force_login(vp)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "Next")
+
+    def test_vp_can_preview_evaluation_in_review(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Review Student")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+            form_data={"q_supervisor_comments": "Ready for review."},
+        )
+        self.client.force_login(vp)
+
+        response = self.client.get(reverse("vp_preview_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ready for review.")
+        self.assertContains(response, "Approve")
+        self.assertContains(response, "Return to draft")
+
+    def test_vp_can_preview_approved_evaluation_read_only(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Approved Student")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.APPROVED,
+            form_data={"q_supervisor_comments": "Final comments."},
+        )
+        self.client.force_login(vp)
+
+        response = self.client.get(reverse("vp_preview_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Final comments.")
+        self.assertContains(response, "approved and finalized")
+        self.assertNotContains(response, ">Approve</button>")
+        self.assertNotContains(response, "Return to draft")
+
+    def test_vp_can_approve_evaluation(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Review Student")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        self.client.force_login(vp)
+
+        response = self.client.post(reverse("approve_evaluation", args=[evaluation.id]))
+
+        self.assertRedirects(response, reverse("dashboard"))
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.APPROVED)
+        self.assertEqual(evaluation.approved_by, vp)
+        self.assertIsNotNone(evaluation.approved_at)
+
+    def test_vp_can_return_evaluation_to_draft(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Review Student")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        self.client.force_login(vp)
+
+        response = self.client.post(reverse("return_evaluation", args=[evaluation.id]))
+
+        self.assertRedirects(response, reverse("dashboard"))
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+        self.assertEqual(evaluation.returned_by, vp)
+        self.assertIsNotNone(evaluation.returned_at)
+
+    def test_manager_cannot_use_vp_review_actions(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Review Student")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(reverse("approve_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 403)
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.IN_REVIEW)
+
     def test_dashboard_rejects_authenticated_user_without_role(self):
         user = get_user_model().objects.create_user(username="employee")
         self.client.force_login(user)
@@ -117,6 +258,58 @@ class BaseAppTests(TestCase):
         self.assertContains(response, "Assigned Employee")
         self.assertNotContains(response, "Inactive Employee")
         self.assertNotContains(response, "Other Employee")
+
+    def test_manager_dashboard_lists_all_owned_evaluations(self):
+        manager = self.create_manager()
+        other_manager = self.create_manager(username="other")
+        draft_employee = Employee.objects.create(name="Draft Employee")
+        in_review_employee = Employee.objects.create(name="Review Employee")
+        approved_employee = Employee.objects.create(name="Approved Employee")
+        other_employee = Employee.objects.create(name="Other Employee")
+        Evaluation.objects.create(
+            manager=manager,
+            employee=draft_employee,
+            state=Evaluation.State.DRAFT,
+        )
+        Evaluation.objects.create(
+            manager=manager,
+            employee=in_review_employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        Evaluation.objects.create(
+            manager=manager,
+            employee=approved_employee,
+            state=Evaluation.State.APPROVED,
+        )
+        Evaluation.objects.create(
+            manager=other_manager,
+            employee=other_employee,
+            state=Evaluation.State.APPROVED,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "Draft Employee")
+        self.assertContains(response, "Review Employee")
+        self.assertContains(response, "Approved Employee")
+        self.assertNotContains(response, "Other Employee")
+
+    def test_manager_dashboard_is_paginated(self):
+        manager = self.create_manager()
+        for index in range(11):
+            employee = Employee.objects.create(name=f"Eval Student {index:02d}")
+            Evaluation.objects.create(
+                manager=manager,
+                employee=employee,
+                state=Evaluation.State.DRAFT,
+            )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "Next")
 
     def test_start_evaluation_creates_draft_and_opens_form(self):
         manager = self.create_manager()
@@ -243,6 +436,95 @@ class BaseAppTests(TestCase):
             evaluation.form_data["q_supervisor_recommendations"],
             "Submitted for review.",
         )
+
+    def test_submitted_evaluation_is_not_editable_from_dashboard(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        ManagerAssignment.objects.create(manager=manager, employee=employee)
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertContains(response, "In Review")
+        self.assertContains(response, "View eval")
+        self.assertNotContains(response, "Continue eval")
+
+    def test_manager_can_preview_submitted_evaluation(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+            form_data={
+                "pi_student": "Assigned Employee",
+                "q_supervisor_comments": "Submitted comments.",
+            },
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("preview_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Submitted evaluation")
+        self.assertContains(response, "Submitted comments.")
+        self.assertContains(response, "Unlock for editing")
+
+    def test_manager_can_preview_approved_evaluation_read_only(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.APPROVED,
+            form_data={"q_supervisor_comments": "Final comments."},
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("preview_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Final comments.")
+        self.assertContains(response, "approved and finalized")
+        self.assertNotContains(response, "Unlock for editing")
+
+    def test_manager_can_unlock_submitted_evaluation_for_editing(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(reverse("unlock_evaluation", args=[evaluation.id]))
+
+        self.assertRedirects(response, reverse("edit_evaluation", args=[evaluation.id]))
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+
+    def test_unlock_rejects_other_manager_evaluation(self):
+        manager = self.create_manager()
+        other_manager = self.create_manager(username="other")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = Evaluation.objects.create(
+            manager=other_manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(reverse("unlock_evaluation", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 404)
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.IN_REVIEW)
 
     def test_submit_for_review_requires_required_end_term_fields(self):
         manager = self.create_manager()

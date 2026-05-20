@@ -141,6 +141,11 @@ button.secondary {
   color: var(--accent);
 }
 
+.secondary-link {
+  background: transparent;
+  color: var(--accent);
+}
+
 button.link-button {
   background: transparent;
   color: var(--accent);
@@ -309,6 +314,18 @@ input[type="checkbox"] {
   gap: 12px;
   justify-content: flex-end;
   padding-top: 8px;
+}
+
+.left-actions {
+  justify-content: flex-start;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 18px;
 }
 
 .sticky-actions {

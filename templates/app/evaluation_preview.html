@@ -1,16 +1,39 @@
 {% extends "base.html" %}
 
-{% block title %}Evaluation{% endblock %}
+{% block title %}Evaluation Preview{% endblock %}
 
 {% block content %}
   <section class="page-head">
-    <p class="eyebrow">UW end-of-term evaluation</p>
+    <p class="eyebrow">Submitted evaluation</p>
     <h1>{{ evaluation.employee.name }}</h1>
   </section>
 
-  <form method="post" class="eval-form">
-    {% csrf_token %}
+  <section class="panel form-section">
+    <h2>Review status</h2>
+    {% if evaluation.state == "approved" %}
+      <p class="hint">This evaluation is approved and finalized. It is read-only.</p>
+    {% elif is_vp_review %}
+      <p class="hint">This evaluation is waiting for VP review.</p>
+      <div class="actions left-actions">
+        <form method="post" action="{% url 'approve_evaluation' evaluation.id %}">
+          {% csrf_token %}
+          <button type="submit">Approve</button>
+        </form>
+        <form method="post" action="{% url 'return_evaluation' evaluation.id %}">
+          {% csrf_token %}
+          <button type="submit" class="secondary">Return to draft</button>
+        </form>
+      </div>
+    {% else %}
+      <p class="hint">This evaluation is in review. Unlock it to make edits and submit it again.</p>
+      <form method="post" action="{% url 'unlock_evaluation' evaluation.id %}">
+        {% csrf_token %}
+        <button type="submit" class="secondary">Unlock for editing</button>
+      </form>
+    {% endif %}
+  </section>
 
+  <form class="eval-form">
     {% for section in form.lead_field_sections %}
       <section class="panel form-section">
         <h2>{{ section.title }}</h2>
@@ -40,7 +63,7 @@
                       id="{{ option.id }}"
                       value="{{ option.value }}"
                       {% if option.checked %}checked{% endif %}
-                      {% if option.disabled %}disabled{% endif %}
+                      disabled
                     >
                     <span class="rating-card">
                       <span class="rating-short">{{ option.short }}</span>
@@ -49,9 +72,6 @@
                   </label>
                 {% endfor %}
               </div>
-              {% if item.field.errors %}
-                <div class="errors">{{ item.field.errors }}</div>
-              {% endif %}
             </div>
           {% endfor %}
         </div>
@@ -66,10 +86,5 @@
         {% endfor %}
       </section>
     {% endfor %}
-
-    <div class="actions sticky-actions">
-      <button type="submit" name="action" value="save_draft" class="secondary">Save as draft</button>
-      <button type="submit" name="action" value="submit_for_review">Submit for review</button>
-    </div>
   </form>
 {% endblock %}

@@ -33,3 +33,13 @@ def manager_required(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapped
+
+
+def vp_required(view_func):
+    @wraps(view_func)
+    def wrapped(request, *args, **kwargs):
+        if not is_vp(request.user):
+            raise PermissionDenied
+        return view_func(request, *args, **kwargs)
+
+    return wrapped

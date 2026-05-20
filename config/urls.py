@@ -24,5 +24,30 @@ urlpatterns = [
         views.edit_evaluation,
         name="edit_evaluation",
     ),
+    path(
+        "evaluations/<int:evaluation_id>/preview/",
+        views.preview_evaluation,
+        name="preview_evaluation",
+    ),
+    path(
+        "evaluations/<int:evaluation_id>/unlock/",
+        views.unlock_evaluation,
+        name="unlock_evaluation",
+    ),
+    path(
+        "vp/evaluations/<int:evaluation_id>/preview/",
+        views.vp_preview_evaluation,
+        name="vp_preview_evaluation",
+    ),
+    path(
+        "vp/evaluations/<int:evaluation_id>/approve/",
+        views.approve_evaluation,
+        name="approve_evaluation",
+    ),
+    path(
+        "vp/evaluations/<int:evaluation_id>/return/",
+        views.return_evaluation,
+        name="return_evaluation",
+    ),
     path("", views.dashboard, name="dashboard"),
 ]

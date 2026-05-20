@@ -113,3 +113,6 @@ class Evaluation(models.Model):
         self.state = self.State.DRAFT
         self.returned_by = reviewer
         self.returned_at = timezone.now()
+
+    def mark_unlocked(self):
+        self.state = self.State.DRAFT

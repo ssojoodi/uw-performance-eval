@@ -237,9 +237,17 @@ class EvaluationForm(forms.Form):
         ],
     )
 
-    def __init__(self, *args, evaluation=None, require_complete=False, **kwargs):
+    def __init__(
+        self,
+        *args,
+        evaluation=None,
+        require_complete=False,
+        read_only=False,
+        **kwargs,
+    ):
         self.evaluation = evaluation
         self.require_complete = require_complete
+        self.read_only = read_only
         if evaluation and not args and "initial" not in kwargs:
             initial = dict(evaluation.form_data)
             initial.setdefault("pi_student", evaluation.employee.name)
@@ -249,6 +257,8 @@ class EvaluationForm(forms.Form):
         self.field_sections = self._build_field_sections()
         self.lead_field_sections = self.field_sections[:2]
         self.followup_field_sections = self.field_sections[2:]
+        if self.read_only:
+            self._set_disabled_fields()
 
     def clean_q_strengths(self):
         return self._clean_limited_choices("q_strengths")
@@ -318,6 +328,7 @@ class EvaluationForm(forms.Form):
                     required=False,
                     choices=RATING_CHOICES,
                     widget=forms.RadioSelect,
+                    disabled=self.read_only,
                 )
                 bound_field = self[field_name]
                 items.append(
@@ -330,6 +341,7 @@ class EvaluationForm(forms.Form):
                                 "name": bound_field.html_name,
                                 "id": f"id_{bound_field.html_name}_{option_index}",
                                 "checked": bound_field.value() == option["value"],
+                                "disabled": self.read_only,
                             }
                             for option_index, option in enumerate(RATING_OPTIONS)
                         ],
@@ -342,3 +354,7 @@ class EvaluationForm(forms.Form):
                 }
             )
         return sections
+
+    def _set_disabled_fields(self):
+        for field in self.fields.values():
+            field.disabled = True

@@ -1,0 +1,37 @@
+{% if page_obj.object_list %}
+  <table>
+    <thead>
+      <tr>
+        <th>Employee</th>
+        {% if is_vp_list %}<th>Manager</th>{% endif %}
+        <th>Status</th>
+        <th>Updated</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for evaluation in page_obj %}
+        <tr>
+          <td><strong>{{ evaluation.employee.name }}</strong></td>
+          {% if is_vp_list %}<td>{{ evaluation.manager.get_username }}</td>{% endif %}
+          <td><span class="status">{{ evaluation.get_state_display }}</span></td>
+          <td>{{ evaluation.updated_at|date:"M j, Y g:i A" }}</td>
+          <td>
+            {% if is_vp_list %}
+              <a class="button-link secondary-link" href="{% url 'vp_preview_evaluation' evaluation.id %}">
+                {% if evaluation.state == "in_review" %}Review eval{% else %}View eval{% endif %}
+              </a>
+            {% elif evaluation.is_editable %}
+              <a class="button-link" href="{% url 'edit_evaluation' evaluation.id %}">Continue eval</a>
+            {% else %}
+              <a class="button-link secondary-link" href="{% url 'preview_evaluation' evaluation.id %}">View eval</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "app/pagination.html" %}
+{% else %}
+  <p class="empty">{{ empty_message }}</p>
+{% endif %}
