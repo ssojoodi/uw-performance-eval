@@ -9,7 +9,7 @@
 - No React.
 - No public REST API in v1.
 - SQLite for local development and deployment.
-- Dockerized single-instance deployment.
+- Docker Compose single-instance deployment.
 
 ## App Structure
 
@@ -52,18 +52,31 @@ Enforce authorization in views, forms, and querysets, not only in templates.
 - VPs cannot deactivate their own account.
 - Employees have no route access in v1.
 
-## Core Models
+## Data Model
 
-- `Employee`: co-op student being evaluated.
-- `ManagerAssignment`: Manager-to-Employee assignment.
-- `Evaluation`: Manager owner, Employee subject, UW form data, workflow state,
-  timestamps, and reviewer metadata.
+- `User`: Django auth user for VPs and Managers. Role comes from exactly one
+  Django `Group`.
+- `Employee`: co-op student being evaluated. Fields: name, email, student ID if
+  available, active flag, timestamps.
+- `ManagerAssignment`: links one Manager `User` to one `Employee`. Fields:
+  manager, employee, active flag, timestamps. Unique active assignment per
+  manager/employee pair.
+- `Evaluation`: one performance evaluation. Fields: manager, employee, state,
+  UW form data, submitted/approved/returned metadata, timestamps.
 
-Removing a `ManagerAssignment` prevents new evaluations for that Employee. It
-does not change ownership of existing evaluations.
+Relationships:
 
-Store stable UW form fields as normal model fields. Use a validated JSON field
-only for form sections that are expected to change.
+- A Manager can have many assigned Employees.
+- An Employee can have many Evaluations over time.
+- An Evaluation belongs to exactly one Manager and one Employee.
+- VPs are not assigned to Employees; they access Evaluations by role.
+
+Rules:
+
+- Removing a `ManagerAssignment` prevents new evaluations for that Employee but
+  does not change existing Evaluation ownership.
+- Store stable UW form fields as normal model fields.
+- Use a validated JSON field only for UW form sections expected to change.
 
 ## Workflow
 
@@ -117,7 +130,7 @@ SQLite is the v1 database.
 - Move to PostgreSQL if write contention, horizontal scaling, or managed
   availability becomes necessary.
 
-## Docker
+## Docker Compose
 
 Required environment:
 
@@ -128,8 +141,13 @@ Required environment:
 - static files configuration
 - CSRF trusted origins when behind HTTPS or a proxy
 
-Container startup should run migrations, serve collected static files, and start
-Django with a production WSGI/ASGI server.
+Deployment runs through `compose.yaml`. The Compose stack should build the
+Django image, mount a durable SQLite volume, expose the web service, and run one
+app container.
+
+Container startup should run migrations and start Django with a production
+WSGI/ASGI server. Static files are collected at image build time and served by
+the Django container.
 
 ## Security
 
