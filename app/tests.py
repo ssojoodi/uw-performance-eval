@@ -1,10 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Employee, Evaluation, ManagerAssignment
+from .evaluation_templates import UW_END_TERM_TEMPLATE_SLUG, UW_END_TERM_TEMPLATE_VERSION
+from .models import Employee, Evaluation, EvaluationTemplate, ManagerAssignment
 from .roles import ROLE_MANAGER, ROLE_VP
 
 
@@ -20,6 +22,16 @@ class BaseAppTests(TestCase):
         vp_group, _ = Group.objects.get_or_create(name=ROLE_VP)
         user.groups.add(vp_group)
         return user
+
+    def get_template(self):
+        return EvaluationTemplate.objects.get(
+            slug=UW_END_TERM_TEMPLATE_SLUG,
+            version=UW_END_TERM_TEMPLATE_VERSION,
+        )
+
+    def create_evaluation(self, **kwargs):
+        kwargs.setdefault("template", self.get_template())
+        return Evaluation.objects.create(**kwargs)
 
     def test_health_check_is_public(self):
         response = self.client.get(reverse("health"))
@@ -75,17 +87,17 @@ class BaseAppTests(TestCase):
         in_review_employee = Employee.objects.create(name="Review Student")
         approved_employee = Employee.objects.create(name="Approved Student")
         draft_employee = Employee.objects.create(name="Draft Student")
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=in_review_employee,
             state=Evaluation.State.IN_REVIEW,
         )
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=approved_employee,
             state=Evaluation.State.APPROVED,
         )
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=draft_employee,
             state=Evaluation.State.DRAFT,
@@ -105,7 +117,7 @@ class BaseAppTests(TestCase):
         manager = self.create_manager()
         for index in range(11):
             employee = Employee.objects.create(name=f"Review Student {index:02d}")
-            Evaluation.objects.create(
+            self.create_evaluation(
                 manager=manager,
                 employee=employee,
                 state=Evaluation.State.IN_REVIEW,
@@ -121,7 +133,7 @@ class BaseAppTests(TestCase):
         vp = self.create_vp()
         manager = self.create_manager()
         employee = Employee.objects.create(name="Review Student")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -140,7 +152,7 @@ class BaseAppTests(TestCase):
         vp = self.create_vp()
         manager = self.create_manager()
         employee = Employee.objects.create(name="Approved Student")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.APPROVED,
@@ -160,7 +172,7 @@ class BaseAppTests(TestCase):
         vp = self.create_vp()
         manager = self.create_manager()
         employee = Employee.objects.create(name="Review Student")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -179,7 +191,7 @@ class BaseAppTests(TestCase):
         vp = self.create_vp()
         manager = self.create_manager()
         employee = Employee.objects.create(name="Review Student")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -197,7 +209,7 @@ class BaseAppTests(TestCase):
     def test_manager_cannot_use_vp_review_actions(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Review Student")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -266,22 +278,22 @@ class BaseAppTests(TestCase):
         in_review_employee = Employee.objects.create(name="Review Employee")
         approved_employee = Employee.objects.create(name="Approved Employee")
         other_employee = Employee.objects.create(name="Other Employee")
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=draft_employee,
             state=Evaluation.State.DRAFT,
         )
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=in_review_employee,
             state=Evaluation.State.IN_REVIEW,
         )
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=approved_employee,
             state=Evaluation.State.APPROVED,
         )
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=other_manager,
             employee=other_employee,
             state=Evaluation.State.APPROVED,
@@ -299,7 +311,7 @@ class BaseAppTests(TestCase):
         manager = self.create_manager()
         for index in range(11):
             employee = Employee.objects.create(name=f"Eval Student {index:02d}")
-            Evaluation.objects.create(
+            self.create_evaluation(
                 manager=manager,
                 employee=employee,
                 state=Evaluation.State.DRAFT,
@@ -311,6 +323,35 @@ class BaseAppTests(TestCase):
         self.assertContains(response, "Page 1 of 2")
         self.assertContains(response, "Next")
 
+    def test_start_evaluation_shows_active_finalized_templates(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        ManagerAssignment.objects.create(manager=manager, employee=employee)
+        draft_template = EvaluationTemplate.objects.create(
+            name="Draft Template",
+            slug="draft-template",
+            version=1,
+            is_active=True,
+            is_finalized=False,
+            schema={"sections": []},
+        )
+        inactive_template = EvaluationTemplate.objects.create(
+            name="Inactive Template",
+            slug="inactive-template",
+            version=1,
+            is_active=False,
+            is_finalized=True,
+            schema={"sections": []},
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("start_evaluation", args=[employee.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.get_template().name)
+        self.assertNotContains(response, draft_template.name)
+        self.assertNotContains(response, inactive_template.name)
+
     def test_start_evaluation_creates_draft_and_opens_form(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
@@ -318,7 +359,8 @@ class BaseAppTests(TestCase):
         self.client.force_login(manager)
 
         response = self.client.post(
-            reverse("start_evaluation", args=[employee.id])
+            reverse("start_evaluation", args=[employee.id]),
+            {"template": self.get_template().id},
         )
 
         evaluation = Evaluation.objects.get()
@@ -328,6 +370,7 @@ class BaseAppTests(TestCase):
         )
         self.assertEqual(evaluation.manager, manager)
         self.assertEqual(evaluation.employee, employee)
+        self.assertEqual(evaluation.template, self.get_template())
         self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
 
     def test_start_evaluation_rejects_unassigned_employee(self):
@@ -345,7 +388,7 @@ class BaseAppTests(TestCase):
     def test_edit_evaluation_renders_form_for_own_draft(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
         )
@@ -361,7 +404,7 @@ class BaseAppTests(TestCase):
     def test_save_as_draft_persists_form_data(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
         )
@@ -403,7 +446,7 @@ class BaseAppTests(TestCase):
     def test_submit_for_review_saves_data_and_transitions_state(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
         )
@@ -440,7 +483,7 @@ class BaseAppTests(TestCase):
     def test_submitted_evaluation_is_not_editable_from_dashboard(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        Evaluation.objects.create(
+        self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -457,7 +500,7 @@ class BaseAppTests(TestCase):
     def test_manager_can_preview_submitted_evaluation(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -478,7 +521,7 @@ class BaseAppTests(TestCase):
     def test_manager_can_preview_approved_evaluation_read_only(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.APPROVED,
@@ -496,7 +539,7 @@ class BaseAppTests(TestCase):
     def test_manager_can_unlock_submitted_evaluation_for_editing(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -513,7 +556,7 @@ class BaseAppTests(TestCase):
         manager = self.create_manager()
         other_manager = self.create_manager(username="other")
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=other_manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -529,7 +572,7 @@ class BaseAppTests(TestCase):
     def test_submit_for_review_requires_required_end_term_fields(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
         )
@@ -551,7 +594,7 @@ class BaseAppTests(TestCase):
     def test_save_as_draft_limits_strengths_to_three(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
         )
@@ -579,7 +622,7 @@ class BaseAppTests(TestCase):
         manager = self.create_manager()
         other_manager = self.create_manager(username="other")
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=other_manager,
             employee=employee,
         )
@@ -592,7 +635,7 @@ class BaseAppTests(TestCase):
     def test_edit_evaluation_rejects_non_draft(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=manager,
             employee=employee,
             state=Evaluation.State.IN_REVIEW,
@@ -621,6 +664,14 @@ class DataModelTests(TestCase):
             email="taylor@example.com",
             student_id="12345678",
         )
+        self.template = EvaluationTemplate.objects.get(
+            slug=UW_END_TERM_TEMPLATE_SLUG,
+            version=UW_END_TERM_TEMPLATE_VERSION,
+        )
+
+    def create_evaluation(self, **kwargs):
+        kwargs.setdefault("template", self.template)
+        return Evaluation.objects.create(**kwargs)
 
     def test_manager_assignment_allows_only_one_active_pair(self):
         ManagerAssignment.objects.create(
@@ -648,18 +699,44 @@ class DataModelTests(TestCase):
 
         self.assertTrue(assignment.is_active)
 
+    def test_seeded_uw_end_term_template_is_finalized(self):
+        self.assertEqual(self.template.name, "UW Co-op Employer End-of-Term Evaluation")
+        self.assertTrue(self.template.is_active)
+        self.assertTrue(self.template.is_finalized)
+        self.assertIn("sections", self.template.schema)
+
+    def test_finalized_template_allows_only_active_flag_changes(self):
+        self.template.is_active = False
+        self.template.save()
+        self.template.refresh_from_db()
+        self.assertFalse(self.template.is_active)
+
+        self.template.name = "Changed"
+        with self.assertRaises(ValidationError):
+            self.template.save()
+
+    def test_finalized_template_can_be_cloned_as_draft(self):
+        clone = self.template.clone_as_draft()
+
+        self.assertEqual(clone.slug, self.template.slug)
+        self.assertEqual(clone.version, self.template.version + 1)
+        self.assertFalse(clone.is_active)
+        self.assertFalse(clone.is_finalized)
+        self.assertEqual(clone.schema, self.template.schema)
+
     def test_evaluation_defaults_to_draft(self):
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=self.manager,
             employee=self.employee,
         )
 
         self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+        self.assertEqual(evaluation.template, self.template)
         self.assertTrue(evaluation.is_editable)
         self.assertEqual(evaluation.form_data, {})
 
     def test_evaluation_metadata_helpers_update_state(self):
-        evaluation = Evaluation.objects.create(
+        evaluation = self.create_evaluation(
             manager=self.manager,
             employee=self.employee,
         )

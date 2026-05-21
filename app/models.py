@@ -1,6 +1,9 @@
+from copy import deepcopy
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.utils import timezone
 
 
@@ -48,6 +51,78 @@ class ManagerAssignment(models.Model):
         return f"{self.manager} -> {self.employee}"
 
 
+class EvaluationTemplate(models.Model):
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=120)
+    description = models.TextField(blank=True)
+    version = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    is_finalized = models.BooleanField(default=False)
+    schema = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["slug", "-version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["slug", "version"],
+                name="unique_evaluation_template_version",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} v{self.version}"
+
+    def clean(self):
+        super().clean()
+        if not self.pk:
+            return
+
+        previous = EvaluationTemplate.objects.get(pk=self.pk)
+        if not previous.is_finalized:
+            return
+
+        immutable_fields = [
+            "name",
+            "slug",
+            "description",
+            "version",
+            "is_finalized",
+            "schema",
+        ]
+        changed_fields = [
+            field
+            for field in immutable_fields
+            if getattr(previous, field) != getattr(self, field)
+        ]
+        if changed_fields:
+            raise ValidationError(
+                "Finalized evaluation templates can only change their active flag."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def clone_as_draft(self):
+        latest_version = (
+            EvaluationTemplate.objects.filter(slug=self.slug).aggregate(Max("version"))[
+                "version__max"
+            ]
+            or self.version
+        )
+        return EvaluationTemplate.objects.create(
+            name=self.name,
+            slug=self.slug,
+            description=self.description,
+            version=latest_version + 1,
+            is_active=False,
+            is_finalized=False,
+            schema=deepcopy(self.schema),
+        )
+
+
 class Evaluation(models.Model):
     class State(models.TextChoices):
         DRAFT = "draft", "Draft"
@@ -61,6 +136,11 @@ class Evaluation(models.Model):
     )
     employee = models.ForeignKey(
         Employee,
+        on_delete=models.PROTECT,
+        related_name="evaluations",
+    )
+    template = models.ForeignKey(
+        EvaluationTemplate,
         on_delete=models.PROTECT,
         related_name="evaluations",
     )
