@@ -81,6 +81,8 @@ Rules:
 - Removing a `ManagerAssignment` prevents new evaluations for that Employee but
   does not change existing Evaluation ownership.
 - Managers can start evaluations only from active finalized templates.
+- Evaluation templates are authored as JSON in `EvaluationTemplate.schema`; adding
+  a new template does not require code changes.
 - Evaluations store answers as validated JSON keyed by the template schema.
 - A finalized template cannot be edited; clone it into a new draft version for
   questionnaire changes.

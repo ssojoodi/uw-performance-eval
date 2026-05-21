@@ -41,6 +41,16 @@ class EvaluationTemplateAdmin(admin.ModelAdmin):
     list_filter = ("is_active", "is_finalized")
     search_fields = ("name", "slug", "description")
     actions = ("clone_as_draft",)
+    schema_help_text = (
+        "JSON object used to render the evaluation form. Supported question types "
+        "are text, select_one, and select_many. Finalize only after the schema is ready."
+    )
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "schema":
+            formfield.help_text = self.schema_help_text
+        return formfield
 
     def get_readonly_fields(self, request, obj=None):
         readonly_fields = ["created_at", "updated_at"]

@@ -1,9 +1,10 @@
 from django import forms
 
-from .evaluation_templates import (
+from .template_schema import (
     QUESTION_SELECT_MANY,
     QUESTION_SELECT_ONE,
     QUESTION_TEXT,
+    iter_schema_questions,
 )
 
 
@@ -43,14 +44,7 @@ class EvaluationForm(forms.Form):
 
     @property
     def questions(self):
-        questions = []
-        for section in self.schema.get("sections", []):
-            if section.get("kind") == "ratings":
-                for group in section.get("groups", []):
-                    questions.extend(group.get("questions", []))
-            else:
-                questions.extend(section.get("questions", []))
-        return questions
+        return list(iter_schema_questions(self.schema))
 
     def clean(self):
         cleaned_data = super().clean()

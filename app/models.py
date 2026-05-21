@@ -6,6 +6,8 @@ from django.db import models
 from django.db.models import Max, Q
 from django.utils import timezone
 
+from .template_schema import validate_template_schema
+
 
 class Employee(models.Model):
     name = models.CharField(max_length=255)
@@ -76,6 +78,8 @@ class EvaluationTemplate(models.Model):
 
     def clean(self):
         super().clean()
+        validate_template_schema(self.schema)
+
         if not self.pk:
             return
 

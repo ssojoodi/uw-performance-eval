@@ -5,14 +5,14 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from .evaluation_templates import (
-    UW_END_TERM_TEMPLATE_SLUG,
-    UW_END_TERM_TEMPLATE_VERSION,
-    UW_MID_TERM_TEMPLATE_SLUG,
-    UW_MID_TERM_TEMPLATE_VERSION,
-)
 from .models import Employee, Evaluation, EvaluationTemplate, ManagerAssignment
 from .roles import ROLE_MANAGER, ROLE_VP
+
+
+UW_END_TERM_TEMPLATE_SLUG = "uw-end-term"
+UW_END_TERM_TEMPLATE_VERSION = 1
+UW_MID_TERM_TEMPLATE_SLUG = "uw-mid-term"
+UW_MID_TERM_TEMPLATE_VERSION = 1
 
 
 class BaseAppTests(TestCase):
@@ -43,6 +43,23 @@ class BaseAppTests(TestCase):
     def create_evaluation(self, **kwargs):
         kwargs.setdefault("template", self.get_template())
         return Evaluation.objects.create(**kwargs)
+
+    def minimal_template_schema(self):
+        return {
+            "sections": [
+                {
+                    "title": "Minimal",
+                    "questions": [
+                        {
+                            "id": "q_minimal",
+                            "label": "Minimal question",
+                            "type": "text",
+                            "required": False,
+                        }
+                    ],
+                }
+            ]
+        }
 
     def test_health_check_is_public(self):
         response = self.client.get(reverse("health"))
@@ -344,7 +361,7 @@ class BaseAppTests(TestCase):
             version=1,
             is_active=True,
             is_finalized=False,
-            schema={"sections": []},
+            schema=self.minimal_template_schema(),
         )
         inactive_template = EvaluationTemplate.objects.create(
             name="Inactive Template",
@@ -352,7 +369,7 @@ class BaseAppTests(TestCase):
             version=1,
             is_active=False,
             is_finalized=True,
-            schema={"sections": []},
+            schema=self.minimal_template_schema(),
         )
         self.client.force_login(manager)
 
@@ -736,6 +753,23 @@ class DataModelTests(TestCase):
         kwargs.setdefault("template", self.template)
         return Evaluation.objects.create(**kwargs)
 
+    def minimal_template_schema(self):
+        return {
+            "sections": [
+                {
+                    "title": "Minimal",
+                    "questions": [
+                        {
+                            "id": "q_minimal",
+                            "label": "Minimal question",
+                            "type": "text",
+                            "required": False,
+                        }
+                    ],
+                }
+            ]
+        }
+
     def test_manager_assignment_allows_only_one_active_pair(self):
         ManagerAssignment.objects.create(
             manager=self.manager,
@@ -776,6 +810,29 @@ class DataModelTests(TestCase):
         self.assertTrue(self.mid_term_template.is_active)
         self.assertTrue(self.mid_term_template.is_finalized)
         self.assertIn("sections", self.mid_term_template.schema)
+
+    def test_template_schema_must_be_valid_json_form_schema(self):
+        template = EvaluationTemplate(
+            name="Invalid",
+            slug="invalid",
+            version=1,
+            schema={"sections": []},
+        )
+
+        with self.assertRaises(ValidationError):
+            template.save()
+
+    def test_new_valid_template_can_be_created_without_code_definition(self):
+        template = EvaluationTemplate.objects.create(
+            name="Custom Template",
+            slug="custom-template",
+            version=1,
+            is_active=True,
+            is_finalized=True,
+            schema=self.minimal_template_schema(),
+        )
+
+        self.assertEqual(template.schema["sections"][0]["questions"][0]["id"], "q_minimal")
 
     def test_finalized_template_allows_only_active_flag_changes(self):
         self.template.is_active = False
