@@ -15,11 +15,15 @@
   --border-color: #2a2823;
   --darkened-bg: #12110f;
   --selected-bg: #1b1915;
+  --selected-row: #252115;
   --button-bg: #f6c76b;
   --button-fg: #111;
   --button-hover-bg: #ffd785;
   --default-button-bg: #f6c76b;
   --default-button-hover-bg: #ffd785;
+  --message-success-bg: #172715;
+  --message-warning-bg: #2b2112;
+  --message-error-bg: #2a1414;
 }
 
 body {
@@ -93,4 +97,77 @@ a.button {
   background: var(--button-bg);
   border-radius: 6px;
   color: var(--button-fg);
+}
+
+#nav-sidebar .current-model {
+  background: #252115;
+}
+
+#nav-sidebar .current-model a,
+#nav-sidebar .current-model th,
+#nav-sidebar .current-model td {
+  color: var(--accent);
+}
+
+#nav-sidebar .current-app .section {
+  color: var(--body-fg);
+}
+
+ul.messagelist {
+  margin: 16px 24px 20px;
+  padding: 0;
+}
+
+ul.messagelist li {
+  position: relative;
+  border: 1px solid #35502a;
+  border-radius: 6px;
+  background: var(--message-success-bg);
+  color: #f5f1e8;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  padding: 13px 18px 13px 52px;
+}
+
+ul.messagelist li::before {
+  content: "✓";
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #7fbd4d;
+  color: #111;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 20px;
+  text-align: center;
+  transform: translateY(-50%);
+}
+
+ul.messagelist li a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+ul.messagelist li.warning {
+  border-color: #6a5125;
+  background: var(--message-warning-bg);
+}
+
+ul.messagelist li.warning::before {
+  content: "!";
+  background: var(--accent);
+}
+
+ul.messagelist li.error {
+  border-color: #6b2a2a;
+  background: var(--message-error-bg);
+}
+
+ul.messagelist li.error::before {
+  content: "×";
+  background: #ff8b7c;
 }
