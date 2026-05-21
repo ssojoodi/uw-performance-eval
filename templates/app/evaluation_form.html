@@ -4,7 +4,7 @@
 
 {% block content %}
   <section class="page-head">
-    <p class="eyebrow">UW end-of-term evaluation</p>
+    <p class="eyebrow">{{ evaluation.template.name }}</p>
     <h1>{{ evaluation.employee.name }}</h1>
   </section>
 
@@ -22,12 +22,13 @@
       </section>
     {% endfor %}
 
-    <section class="panel form-section">
-      <h2>Rating Details</h2>
-      {% for section in form.competency_sections %}
+    {% if form.competency_sections %}
+      <section class="panel form-section">
+        <h2>{{ form.rating_section_title }}</h2>
+        {% for section in form.competency_sections %}
         <div class="competency-group">
           <h3>{{ section.title }}</h3>
-          <p class="hint">Student demonstrates the ability to:</p>
+          {% if section.intro %}<p class="hint">{{ section.intro }}</p>{% endif %}
           {% for item in section.items %}
             <div class="rating-row">
               <div class="rating-label">{{ item.label }}</div>
@@ -55,8 +56,9 @@
             </div>
           {% endfor %}
         </div>
-      {% endfor %}
-    </section>
+        {% endfor %}
+      </section>
+    {% endif %}
 
     {% for section in form.followup_field_sections %}
       <section class="panel form-section">

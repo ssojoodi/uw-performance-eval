@@ -15,8 +15,8 @@
 
 Keep the app simple:
 
-- `models.py`: Employees, ManagerAssignments, Evaluations, and profile data if
-  needed.
+- `models.py`: Employees, ManagerAssignments, EvaluationTemplates, Evaluations,
+  and profile data if needed.
 - `forms.py`: user management, assignments, evaluations, and import validation.
 - `views.py`: authenticated pages and workflow actions.
 - `services.py`: workflow transitions and import/export logic if views become
@@ -62,22 +62,32 @@ Enforce authorization in views, forms, and querysets, not only in templates.
 - `ManagerAssignment`: links one Manager `User` to one `Employee`. Fields:
   manager, employee, active flag, timestamps. Unique active assignment per
   manager/employee pair.
+- `EvaluationTemplate`: versioned questionnaire definition. Fields: name, slug,
+  version, active flag, finalized flag, JSON schema, timestamps. Finalized
+  templates are immutable except for the active flag.
 - `Evaluation`: one performance evaluation. Fields: manager, employee, state,
-  UW form data, submitted/approved/returned metadata, timestamps.
+  template, response data, submitted/approved/returned metadata, timestamps.
 
 Relationships:
 
 - A Manager can have many assigned Employees.
 - An Employee can have many Evaluations over time.
-- An Evaluation belongs to exactly one Manager and one Employee.
+- An Evaluation belongs to exactly one Manager, one Employee, and one
+  EvaluationTemplate version.
 - VPs are not assigned to Employees; they access Evaluations by role.
 
 Rules:
 
 - Removing a `ManagerAssignment` prevents new evaluations for that Employee but
   does not change existing Evaluation ownership.
-- Store stable UW form fields as normal model fields.
-- Use a validated JSON field only for UW form sections expected to change.
+- Managers can start evaluations only from active finalized templates.
+- Evaluation templates are authored as JSON in `EvaluationTemplate.schema`; adding
+  a new template does not require code changes.
+- Evaluations store answers as validated JSON keyed by the template schema.
+- A finalized template cannot be edited; clone it into a new draft version for
+  questionnaire changes.
+- Template question types are select-one, select-many, and text.
+- Built-in v1 templates are UW end-of-term evaluation and UW mid-term review.
 
 ## Workflow
 

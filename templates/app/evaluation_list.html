@@ -4,6 +4,7 @@
       <tr>
         <th>Employee</th>
         {% if is_vp_list %}<th>Manager</th>{% endif %}
+        <th>Template</th>
         <th>Status</th>
         <th>Updated</th>
         <th>Action</th>
@@ -14,6 +15,7 @@
         <tr>
           <td><strong>{{ evaluation.employee.name }}</strong></td>
           {% if is_vp_list %}<td>{{ evaluation.manager.get_username }}</td>{% endif %}
+          <td>{{ evaluation.template.name }} v{{ evaluation.template.version }}</td>
           <td><span class="status">{{ evaluation.get_state_display }}</span></td>
           <td>{{ evaluation.updated_at|date:"M j, Y g:i A" }}</td>
           <td>

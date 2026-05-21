@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Employee, Evaluation, ManagerAssignment
+from .models import Employee, Evaluation, EvaluationTemplate, ManagerAssignment
 
 
 @admin.register(Employee)
@@ -24,11 +24,61 @@ class ManagerAssignmentAdmin(admin.ModelAdmin):
 
 @admin.register(Evaluation)
 class EvaluationAdmin(admin.ModelAdmin):
-    list_display = ("employee", "manager", "state", "updated_at")
-    list_filter = ("state",)
+    list_display = ("employee", "manager", "template", "state", "updated_at")
+    list_filter = ("state", "template")
     search_fields = (
         "manager__username",
         "manager__email",
         "employee__name",
         "employee__email",
+        "template__name",
     )
+
+
+@admin.register(EvaluationTemplate)
+class EvaluationTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "version", "is_active", "is_finalized", "updated_at")
+    list_filter = ("is_active", "is_finalized")
+    search_fields = ("name", "slug", "description")
+    actions = ("clone_as_draft",)
+    schema_help_text = (
+        "JSON object used to render the evaluation form. Supported question types "
+        "are text, select_one, and select_many. Finalize only after the schema is ready."
+    )
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        formfield = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == "schema":
+            formfield.help_text = self.schema_help_text
+        return formfield
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = ["created_at", "updated_at"]
+        if obj and obj.is_finalized:
+            readonly_fields.extend(
+                [
+                    "name",
+                    "slug",
+                    "description",
+                    "version",
+                    "is_finalized",
+                    "schema",
+                ]
+            )
+        return readonly_fields
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_finalized:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        queryset.filter(is_finalized=False).delete()
+
+    @admin.action(description="Clone selected templates as editable drafts")
+    def clone_as_draft(self, request, queryset):
+        created_count = 0
+        for template in queryset:
+            template.clone_as_draft()
+            created_count += 1
+        self.message_user(request, f"Created {created_count} draft template clone(s).")

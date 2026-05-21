@@ -30,10 +30,7 @@
               <td><strong>{{ item.employee.name }}</strong></td>
               <td>{{ item.employee.email|default:"-" }}</td>
               <td>
-                <form method="post" action="{% url 'start_evaluation' item.employee.id %}">
-                  {% csrf_token %}
-                  <button type="submit">Start new eval</button>
-                </form>
+                <a class="button-link" href="{% url 'start_evaluation' item.employee.id %}">Start new eval</a>
               </td>
             </tr>
           {% endfor %}

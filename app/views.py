@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import EvaluationForm
-from .models import Evaluation, ManagerAssignment
+from .models import Evaluation, EvaluationTemplate, ManagerAssignment
 from .roles import is_manager, is_vp, manager_required, vp_required
 
 
@@ -24,7 +24,7 @@ def dashboard(request):
     if is_vp(request.user):
         evaluations = Evaluation.objects.filter(
             state__in=[Evaluation.State.IN_REVIEW, Evaluation.State.APPROVED]
-        ).select_related("employee", "manager")
+        ).select_related("employee", "manager", "template")
         return render(
             request,
             "app/vp_dashboard.html",
@@ -57,7 +57,7 @@ def dashboard(request):
         )
 
     evaluations = Evaluation.objects.filter(manager=request.user).select_related(
-        "employee"
+        "employee", "template"
     )
     return render(
         request,
@@ -74,9 +74,6 @@ def dashboard(request):
 @login_required
 @manager_required
 def start_evaluation(request, employee_id):
-    if request.method != "POST":
-        return redirect("dashboard")
-
     assignment = get_object_or_404(
         ManagerAssignment.objects.select_related("employee"),
         manager=request.user,
@@ -84,19 +81,36 @@ def start_evaluation(request, employee_id):
         employee__is_active=True,
         is_active=True,
     )
-    evaluation = Evaluation.objects.create(
-        manager=request.user,
-        employee=assignment.employee,
+
+    templates = EvaluationTemplate.objects.filter(
+        is_active=True,
+        is_finalized=True,
     )
 
-    return redirect("edit_evaluation", evaluation_id=evaluation.id)
+    if request.method == "POST":
+        template = get_object_or_404(templates, id=request.POST.get("template"))
+        evaluation = Evaluation.objects.create(
+            manager=request.user,
+            employee=assignment.employee,
+            template=template,
+        )
+        return redirect("edit_evaluation", evaluation_id=evaluation.id)
+
+    return render(
+        request,
+        "app/template_select.html",
+        {
+            "employee": assignment.employee,
+            "templates": templates,
+        },
+    )
 
 
 @login_required
 @manager_required
 def edit_evaluation(request, evaluation_id):
     evaluation = get_object_or_404(
-        Evaluation.objects.select_related("employee", "manager"),
+        Evaluation.objects.select_related("employee", "manager", "template"),
         id=evaluation_id,
         manager=request.user,
         state=Evaluation.State.DRAFT,
@@ -133,7 +147,7 @@ def edit_evaluation(request, evaluation_id):
 @manager_required
 def preview_evaluation(request, evaluation_id):
     evaluation = get_object_or_404(
-        Evaluation.objects.select_related("employee", "manager"),
+        Evaluation.objects.select_related("employee", "manager", "template"),
         id=evaluation_id,
         manager=request.user,
         state__in=[Evaluation.State.IN_REVIEW, Evaluation.State.APPROVED],
@@ -172,7 +186,7 @@ def unlock_evaluation(request, evaluation_id):
 @vp_required
 def vp_preview_evaluation(request, evaluation_id):
     evaluation = get_object_or_404(
-        Evaluation.objects.select_related("employee", "manager"),
+        Evaluation.objects.select_related("employee", "manager", "template"),
         id=evaluation_id,
         state__in=[Evaluation.State.IN_REVIEW, Evaluation.State.APPROVED],
     )

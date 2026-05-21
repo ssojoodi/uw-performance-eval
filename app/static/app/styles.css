@@ -199,6 +199,22 @@ h3 {
   gap: 18px;
 }
 
+.template-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.template-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0c0b0a;
+  padding: 16px;
+}
+
 .hint {
   margin: 0;
   color: var(--muted);
@@ -355,5 +371,6 @@ input[type="checkbox"] {
   tr { border-bottom: 1px solid var(--line); padding: 14px 0; }
   tr:last-child { border-bottom: 0; }
   .form-grid { grid-template-columns: 1fr; }
+  .template-option { align-items: flex-start; flex-direction: column; }
   .rating-options { grid-template-columns: 1fr; }
 }
