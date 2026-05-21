@@ -4,6 +4,8 @@ QUESTION_SELECT_MANY = "select_many"
 
 UW_END_TERM_TEMPLATE_SLUG = "uw-end-term"
 UW_END_TERM_TEMPLATE_VERSION = 1
+UW_MID_TERM_TEMPLATE_SLUG = "uw-mid-term"
+UW_MID_TERM_TEMPLATE_VERSION = 1
 
 RATING_OPTIONS = [
     {"value": "Not observed", "short": "N.O.", "text": "Not observed"},
@@ -117,6 +119,10 @@ def select_many_question(question_id, label, choices, *, required=False, max_sel
         question["max_selections"] = max_selections
         question["hint"] = f"Select up to {max_selections}."
     return question
+
+
+def framework_hint():
+    return "For more information on these 12 competencies, see the Future Ready Talent Framework."
 
 
 UW_END_TERM_SCHEMA = {
@@ -267,4 +273,88 @@ UW_END_TERM_TEMPLATE_DEFINITION = {
     "is_active": True,
     "is_finalized": True,
     "schema": UW_END_TERM_SCHEMA,
+}
+
+UW_MID_TERM_SCHEMA = {
+    "schema_version": 1,
+    "sections": [
+        {
+            "title": "Placement Information",
+            "layout": "grid",
+            "questions": [
+                text_question("pi_student", "Student Name", max_length=255),
+            ],
+        },
+        {
+            "title": "Your Information (Who Is Completing This Form)",
+            "layout": "grid",
+            "questions": [
+                text_question("q_your_name", "Your full name", max_length=255),
+            ],
+        },
+        {
+            "title": "Your Feedback - Required",
+            "questions": [
+                select_one_question(
+                    "q_expectations",
+                    "Overall, how is the student meeting your expectations with respect to their job performance and conduct at work?",
+                    [
+                        "Exceeding expectations",
+                        "Meeting expectations",
+                        "Not meeting expectations",
+                    ],
+                    required=True,
+                ),
+                select_one_question(
+                    "q_eem_questions",
+                    "Do you have any other questions or concerns that you would like to talk about with your Employer Experience Manager?",
+                    ["Yes", "No"],
+                    required=True,
+                ),
+            ],
+        },
+        {
+            "title": "Your Feedback - Optional",
+            "questions": [
+                {
+                    **select_one_question(
+                        "q_strength",
+                        "Based on the student's performance in the role to date, please select your student's top area of strength:",
+                        FRAMEWORK_OPTIONS,
+                    ),
+                    "hint": framework_hint(),
+                },
+                text_question(
+                    "q_strength_comments",
+                    "Please provide any additional comments on your student's top area of strength:",
+                    multiline=True,
+                    rows=4,
+                ),
+                {
+                    **select_one_question(
+                        "q_development",
+                        "Based on the student's performance in the role to date, please select an area for development:",
+                        FRAMEWORK_OPTIONS,
+                    ),
+                    "hint": framework_hint(),
+                },
+                text_question(
+                    "q_development_comments",
+                    "Please provide any additional comments on your student's top area for development:",
+                    multiline=True,
+                    rows=4,
+                ),
+            ],
+        },
+    ],
+}
+
+UW_MID_TERM_TEMPLATE_DEFINITION = {
+    "name": "UW Co-op Employer Mid-term Review",
+    "slug": UW_MID_TERM_TEMPLATE_SLUG,
+    "description": "University of Waterloo employer mid-term check-in review.",
+    "version": UW_MID_TERM_TEMPLATE_VERSION,
+    "is_active": True,
+    "is_finalized": True,
+    "schema": UW_MID_TERM_SCHEMA,
 }

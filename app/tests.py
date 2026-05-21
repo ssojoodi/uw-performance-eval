@@ -5,7 +5,12 @@ from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
-from .evaluation_templates import UW_END_TERM_TEMPLATE_SLUG, UW_END_TERM_TEMPLATE_VERSION
+from .evaluation_templates import (
+    UW_END_TERM_TEMPLATE_SLUG,
+    UW_END_TERM_TEMPLATE_VERSION,
+    UW_MID_TERM_TEMPLATE_SLUG,
+    UW_MID_TERM_TEMPLATE_VERSION,
+)
 from .models import Employee, Evaluation, EvaluationTemplate, ManagerAssignment
 from .roles import ROLE_MANAGER, ROLE_VP
 
@@ -27,6 +32,12 @@ class BaseAppTests(TestCase):
         return EvaluationTemplate.objects.get(
             slug=UW_END_TERM_TEMPLATE_SLUG,
             version=UW_END_TERM_TEMPLATE_VERSION,
+        )
+
+    def get_mid_term_template(self):
+        return EvaluationTemplate.objects.get(
+            slug=UW_MID_TERM_TEMPLATE_SLUG,
+            version=UW_MID_TERM_TEMPLATE_VERSION,
         )
 
     def create_evaluation(self, **kwargs):
@@ -349,6 +360,7 @@ class BaseAppTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.get_template().name)
+        self.assertContains(response, self.get_mid_term_template().name)
         self.assertNotContains(response, draft_template.name)
         self.assertNotContains(response, inactive_template.name)
 
@@ -372,6 +384,53 @@ class BaseAppTests(TestCase):
         self.assertEqual(evaluation.employee, employee)
         self.assertEqual(evaluation.template, self.get_template())
         self.assertEqual(evaluation.state, Evaluation.State.DRAFT)
+
+    def test_start_evaluation_can_create_mid_term_review(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        template = self.get_mid_term_template()
+        ManagerAssignment.objects.create(manager=manager, employee=employee)
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("start_evaluation", args=[employee.id]),
+            {"template": template.id},
+        )
+
+        evaluation = Evaluation.objects.get()
+        self.assertRedirects(response, reverse("edit_evaluation", args=[evaluation.id]))
+        self.assertEqual(evaluation.template, template)
+
+    def test_mid_term_review_form_saves_and_validates_required_fields(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = self.create_evaluation(
+            manager=manager,
+            employee=employee,
+            template=self.get_mid_term_template(),
+        )
+        self.client.force_login(manager)
+
+        response = self.client.post(
+            reverse("edit_evaluation", args=[evaluation.id]),
+            {
+                "pi_student": "Assigned Employee",
+                "q_your_name": "Manager Person",
+                "q_expectations": "Meeting expectations",
+                "q_eem_questions": "No",
+                "q_strength": "Communication",
+                "q_strength_comments": "Clear updates.",
+                "q_development": "Implementation",
+                "q_development_comments": "More independent delivery.",
+                "action": "submit_for_review",
+            },
+        )
+
+        self.assertRedirects(response, reverse("dashboard"))
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.IN_REVIEW)
+        self.assertEqual(evaluation.form_data["q_expectations"], "Meeting expectations")
+        self.assertEqual(evaluation.form_data["q_eem_questions"], "No")
 
     def test_start_evaluation_rejects_unassigned_employee(self):
         manager = self.create_manager()
@@ -668,6 +727,10 @@ class DataModelTests(TestCase):
             slug=UW_END_TERM_TEMPLATE_SLUG,
             version=UW_END_TERM_TEMPLATE_VERSION,
         )
+        self.mid_term_template = EvaluationTemplate.objects.get(
+            slug=UW_MID_TERM_TEMPLATE_SLUG,
+            version=UW_MID_TERM_TEMPLATE_VERSION,
+        )
 
     def create_evaluation(self, **kwargs):
         kwargs.setdefault("template", self.template)
@@ -704,6 +767,15 @@ class DataModelTests(TestCase):
         self.assertTrue(self.template.is_active)
         self.assertTrue(self.template.is_finalized)
         self.assertIn("sections", self.template.schema)
+
+    def test_seeded_mid_term_template_is_finalized(self):
+        self.assertEqual(
+            self.mid_term_template.name,
+            "UW Co-op Employer Mid-term Review",
+        )
+        self.assertTrue(self.mid_term_template.is_active)
+        self.assertTrue(self.mid_term_template.is_finalized)
+        self.assertIn("sections", self.mid_term_template.schema)
 
     def test_finalized_template_allows_only_active_flag_changes(self):
         self.template.is_active = False

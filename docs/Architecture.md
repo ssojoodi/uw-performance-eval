@@ -85,6 +85,7 @@ Rules:
 - A finalized template cannot be edited; clone it into a new draft version for
   questionnaire changes.
 - Template question types are select-one, select-many, and text.
+- Built-in v1 templates are UW end-of-term evaluation and UW mid-term review.
 
 ## Workflow
 
