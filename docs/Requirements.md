@@ -249,6 +249,7 @@ The Export & Import feature allows evaluation data to be moved in and out of the
 ## Terminology
 
 * **Markdown Export**: An export of evaluation content formatted as Markdown, structured to match the University of Waterloo co-op evaluation form for use in the official portal.
+* **PDF Export**: A printable export of evaluation content with the same fields as the Markdown export.
 
 ## Requirements
 
@@ -261,7 +262,15 @@ The Export & Import feature allows evaluation data to be moved in and out of the
 * **AC-EXPORT-001.1:** When a Manager exports an evaluation as Markdown, the system shall generate a Markdown-formatted file containing all evaluation fields and their values.
 * **AC-EXPORT-001.2:** When generating the Markdown export, the system shall structure the output to match the University of Waterloo co-op evaluation form format.
 
+### REQ-EXPORT-002: Export Evaluation as PDF
+
+**User Story:** As a Manager, I want to export an evaluation as a PDF, so that I can share or archive a printable copy of a draft or finalized evaluation.
+
+**Acceptance Criteria:**
+
+* **AC-EXPORT-002.1:** When a Manager exports an evaluation as PDF, the system shall generate a PDF file containing all evaluation fields and their values.
+* **AC-EXPORT-002.2:** When generating the PDF export, the system shall include the same evaluation content as the Markdown export in a readable printable layout.
+
 ## Feature Behavior & Rules
 
-Export is available on any evaluation regardless of its current workflow state. Import always creates a new Draft evaluation — it never overwrites an existing record. The Markdown export format corresponds to the University of Waterloo co-op evaluation portal structure. JSON export and import use the same schema, ensuring that a file exported from this platform can be re-imported without modification.
-
+Export is available on any evaluation regardless of its current workflow state. Import always creates a new Draft evaluation — it never overwrites an existing record. The Markdown export format corresponds to the University of Waterloo co-op evaluation portal structure. PDF export provides a printable copy with the same evaluation content. JSON export and import use the same schema, ensuring that a file exported from this platform can be re-imported without modification.

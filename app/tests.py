@@ -612,6 +612,97 @@ class BaseAppTests(TestCase):
         self.assertContains(response, "approved and finalized")
         self.assertNotContains(response, "Unlock for editing")
 
+    def test_manager_can_export_draft_evaluation_as_markdown(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(
+            name="Assigned Employee",
+            student_id="12345678",
+        )
+        evaluation = self.create_evaluation(
+            manager=manager,
+            employee=employee,
+            form_data={
+                "pi_term": "Winter 2026",
+                "q_strengths": ["Communication", "Collaboration"],
+                "q_supervisor_comments": "Draft comments.",
+            },
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(
+            reverse("export_evaluation_markdown", args=[evaluation.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/markdown; charset=utf-8")
+        self.assertIn(".md", response["Content-Disposition"])
+        content = response.content.decode()
+        self.assertIn("# Assigned Employee Evaluation", content)
+        self.assertIn("**Status:** Draft", content)
+        self.assertIn("**Student ID:** 12345678", content)
+        self.assertIn("Winter 2026", content)
+        self.assertIn("Communication, Collaboration", content)
+        self.assertIn("Draft comments.", content)
+
+    def test_manager_can_export_approved_evaluation_as_pdf(self):
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = self.create_evaluation(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.APPROVED,
+            form_data={
+                "pi_term": "Winter 2026",
+                "q_supervisor_comments": "Final PDF comments.",
+            },
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("export_evaluation_pdf", args=[evaluation.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn(".pdf", response["Content-Disposition"])
+        self.assertTrue(response.content.startswith(b"%PDF"))
+        self.assertGreater(len(response.content), 1000)
+        evaluation.refresh_from_db()
+        self.assertEqual(evaluation.state, Evaluation.State.APPROVED)
+
+    def test_vp_can_export_review_evaluation_as_markdown(self):
+        vp = self.create_vp()
+        manager = self.create_manager()
+        employee = Employee.objects.create(name="Review Employee")
+        evaluation = self.create_evaluation(
+            manager=manager,
+            employee=employee,
+            state=Evaluation.State.IN_REVIEW,
+            form_data={"q_supervisor_comments": "Ready for export."},
+        )
+        self.client.force_login(vp)
+
+        response = self.client.get(
+            reverse("export_evaluation_markdown", args=[evaluation.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ready for export.")
+
+    def test_export_rejects_other_manager_evaluation(self):
+        manager = self.create_manager()
+        other_manager = self.create_manager(username="other")
+        employee = Employee.objects.create(name="Assigned Employee")
+        evaluation = self.create_evaluation(
+            manager=other_manager,
+            employee=employee,
+        )
+        self.client.force_login(manager)
+
+        response = self.client.get(
+            reverse("export_evaluation_markdown", args=[evaluation.id])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_manager_can_unlock_submitted_evaluation_for_editing(self):
         manager = self.create_manager()
         employee = Employee.objects.create(name="Assigned Employee")

@@ -6,6 +6,10 @@
   <section class="page-head">
     <p class="eyebrow">{{ evaluation.template.name }}</p>
     <h1>{{ evaluation.employee.name }}</h1>
+    <div class="actions left-actions">
+      <a class="button-link secondary-link" href="{% url 'export_evaluation_markdown' evaluation.id %}">Export MD</a>
+      <a class="button-link secondary-link" href="{% url 'export_evaluation_pdf' evaluation.id %}">Export PDF</a>
+    </div>
   </section>
 
   <form method="post" class="eval-form">

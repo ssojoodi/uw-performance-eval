@@ -19,15 +19,19 @@
           <td><span class="status">{{ evaluation.get_state_display }}</span></td>
           <td>{{ evaluation.updated_at|date:"M j, Y g:i A" }}</td>
           <td>
-            {% if is_vp_list %}
-              <a class="button-link secondary-link" href="{% url 'vp_preview_evaluation' evaluation.id %}">
-                {% if evaluation.state == "in_review" %}Review eval{% else %}View eval{% endif %}
-              </a>
-            {% elif evaluation.is_editable %}
-              <a class="button-link" href="{% url 'edit_evaluation' evaluation.id %}">Continue eval</a>
-            {% else %}
-              <a class="button-link secondary-link" href="{% url 'preview_evaluation' evaluation.id %}">View eval</a>
-            {% endif %}
+            <div class="table-actions">
+              {% if is_vp_list %}
+                <a class="button-link secondary-link" href="{% url 'vp_preview_evaluation' evaluation.id %}">
+                  {% if evaluation.state == "in_review" %}Review eval{% else %}View eval{% endif %}
+                </a>
+              {% elif evaluation.is_editable %}
+                <a class="button-link" href="{% url 'edit_evaluation' evaluation.id %}">Continue eval</a>
+              {% else %}
+                <a class="button-link secondary-link" href="{% url 'preview_evaluation' evaluation.id %}">View eval</a>
+              {% endif %}
+              <a class="button-link secondary-link" href="{% url 'export_evaluation_markdown' evaluation.id %}">MD</a>
+              <a class="button-link secondary-link" href="{% url 'export_evaluation_pdf' evaluation.id %}">PDF</a>
+            </div>
           </td>
         </tr>
       {% endfor %}

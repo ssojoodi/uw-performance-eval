@@ -118,6 +118,12 @@ Markdown export:
 - Includes all evaluation fields.
 - Does not change workflow state.
 
+PDF export:
+
+- Available to users who can view the evaluation.
+- Includes the same evaluation fields as Markdown export in a printable layout.
+- Does not change workflow state.
+
 JSON export:
 
 - Available to users who can view the evaluation.
@@ -153,6 +159,7 @@ Required environment:
 - `ALLOWED_HOSTS`
 - SQLite database path
 - static files configuration
+- secure cookie flags for HTTPS deployments
 - CSRF trusted origins when behind HTTPS or a proxy
 
 Deployment runs through `compose.yaml`. The Compose stack should build the
@@ -167,7 +174,8 @@ the Django container.
 
 - Use Django password hashing.
 - Keep CSRF enabled.
-- Set secure session/cookie settings in production.
+- Set `SESSION_COOKIE_SECURE=true` and `CSRF_COOKIE_SECURE=true` in production
+  HTTPS deployments.
 - Deactivation sets `is_active=false`.
 - Do not log evaluation content or uploaded JSON payloads.
 
@@ -180,6 +188,6 @@ Cover:
 - VP user management and self-deactivation prevention;
 - Manager scoping and assignment checks;
 - workflow transitions and edit locking;
-- Markdown export access/content;
+- Markdown and PDF export access/content;
 - JSON import/export round trip and malformed JSON handling;
 - Docker build and migration startup.

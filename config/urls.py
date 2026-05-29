@@ -35,6 +35,16 @@ urlpatterns = [
         name="unlock_evaluation",
     ),
     path(
+        "evaluations/<int:evaluation_id>/export.md",
+        views.export_evaluation_markdown,
+        name="export_evaluation_markdown",
+    ),
+    path(
+        "evaluations/<int:evaluation_id>/export.pdf",
+        views.export_evaluation_pdf,
+        name="export_evaluation_pdf",
+    ),
+    path(
         "vp/evaluations/<int:evaluation_id>/preview/",
         views.vp_preview_evaluation,
         name="vp_preview_evaluation",
