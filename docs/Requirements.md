@@ -40,19 +40,21 @@ Access is controlled by three roles — VP, Manager, and Employee — so that ea
 
 ## Personas
 
-The **VP** manages both the platform and the evaluation process. They create and manage user accounts, assign roles, and assign co-op Employees to Managers. They have organization-wide visibility into all evaluations, review submissions from Managers, and provide final approval before evaluations are submitted to the University of Waterloo. They can return evaluations to Draft if corrections are needed.
+The **VP** manages both the platform and the evaluation process. They create and manage user accounts, assign roles, and assign co-op Employees to Managers. They review submissions from Managers and provide final approval before evaluations are submitted to the University of Waterloo. They can return evaluations to Draft if corrections are needed.
 
 The **Manager** is the primary author of performance evaluations. They supervise co-op students directly and are responsible for creating, editing, and submitting evaluations for the Employees assigned to them. They can only view and act on evaluations they created. They initiate the review process by submitting a completed draft for VP review.
 
-The **Employee** represents a co-op student placed at the organization. They are the subject of the performance evaluations created by their assigned Manager. Their platform access is the most restricted of the three roles and will be defined as the product is implemented.
+The **Employee** represents a co-op student placed at the organization. They are the subject of the performance evaluations created by their assigned Manager and do not log in for v1.
 
 ## Success Metrics
 
-Success is measured primarily by whether the platform eliminates the coordination overhead of the current PDF-based process. Evaluations should be completed and submitted to the University of Waterloo on time without requiring email exchanges to share or route the document. The time Managers spend completing and routing evaluations should decrease relative to the previous process. All evaluations should pass through VP HR approval before submission. No evaluation data should be lost due to browser state issues or manual file management, as was a risk with the local-storage-based predecessor.
+Success is measured primarily by whether the platform eliminates the coordination overhead of the current PDF-based process. Evaluations should be completed and submitted to the University of Waterloo on time without requiring email exchanges to share or route the document. The time Managers spend completing and routing evaluations should decrease relative to the previous process. All evaluations should pass through VP approval before submission. No evaluation data should be lost due to browser state issues or manual file management, as was a risk with the local-storage-based predecessor.
 
 ## Technical Requirements
 
-All access to the platform requires authentication — no functionality is accessible without a valid session. Role-based access control enforces the four defined roles (Admin, VP HR, Manager, Employee) at the application level, server-side. The platform is accessible via web browser with no client-side installation required. Evaluation data is persisted server-side, not in browser local storage.
+All access to the platform requires authentication — no functionality is accessible without a valid session. Role-based access control enforces the three business roles (VP, Manager, Employee) at the application level, server-side. The platform is accessible via web browser with no client-side installation required. Evaluation data is persisted server-side, not in browser local storage.
+
+The v1 deployment runs as a single-instance Django application backed by SQLite on durable mounted storage. Container startup runs database migrations before serving traffic. Static assets are collected at image build time. HTTPS deployments must configure secure session/CSRF cookies and trusted CSRF origins.
 
 # Feature Requirements
 
@@ -131,7 +133,9 @@ The Authentication & Authorization feature controls who can access the platform 
 
 ## Feature Behavior & Rules
 
-All routes and API endpoints require an authenticated session. Role permissions are enforced server-side and cannot be bypassed through client-side manipulation. A VP cannot deactivate their own account. Each user holds exactly one role at a time. The three roles have distinct scopes: VP manages user accounts, assigns co-op Employees to Managers, and has full visibility and approval rights over all evaluations; Manager creates and submits evaluations only for their assigned Employees and can only view evaluations they own; Employee has the most restricted access in the system.
+All routes and API endpoints require an authenticated session. Role permissions are enforced server-side and cannot be bypassed through client-side manipulation. Django superusers are technical operators, not product Admin users. A VP cannot deactivate their own account. Each active product user holds exactly one business role at a time. Employees are evaluation subjects only and do not log in for v1.
+
+The three roles have distinct scopes: VP manages user accounts, assigns co-op Employees to Managers, and has review/approval visibility; Manager creates and submits evaluations only for assigned Employees and can only view evaluations they own; Employee has no route access in v1.
 
 ## Evaluation Management
 
@@ -185,15 +189,17 @@ Evaluation Management is the core function of the platform. It allows Managers t
 
 ### REQ-EVAL-005: VP Evaluation Visibility
 
-**User Story:** As a VP, I want to view all evaluations in the system, so that I can monitor the process and review submissions.
+**User Story:** As a VP, I want to view evaluations awaiting review and finalized evaluations, so that I can monitor the approval process.
 
 **Acceptance Criteria:**
 
-* **AC-EVAL-005.1:** When a VP views the evaluations list, the system shall display all evaluations across all Managers and their current workflow states.
+* **AC-EVAL-005.1:** When a VP views the evaluations list, the system shall display In Review and Approved evaluations across all Managers with their current workflow states.
 
 ## Feature Behavior & Rules
 
-Evaluations are owned by the Manager who created them. Only the owning Manager can edit an evaluation in Draft state. VP can view any evaluation but cannot edit evaluation content. A Manager can only view and act on evaluations they created, and can only create evaluations for Employees assigned to them by a VP. Draft evaluations are stored server-side and are not tied to browser state.
+Evaluations are owned by the Manager who created them. Only the owning Manager can edit an evaluation in Draft state. VP can view evaluations awaiting review and approved evaluations but cannot edit evaluation content. A Manager can only view and act on evaluations they created, and can only create evaluations for Employees assigned to them by a VP. Draft evaluations are stored server-side and are not tied to browser state.
+
+Managers can start evaluations only from active finalized templates. Evaluation templates are versioned JSON definitions; supported question types are text, select-one, and select-many. A finalized template is immutable except for its active flag. Removing a Manager assignment prevents new evaluations but does not change ownership of existing evaluations.
 
 ## Collaboration & Approval Workflow
 
@@ -236,9 +242,19 @@ The Collaboration & Approval Workflow feature routes evaluations through an inte
 * **AC-COLLAB-003.1:** When a VP approves an In Review evaluation, the system shall transition the evaluation's state to Approved.
 * **AC-COLLAB-003.2:** When an evaluation is Approved, the system shall prevent editing by any user.
 
+### REQ-COLLAB-004: Unlock Submitted Evaluation
+
+**User Story:** As a Manager, I want to unlock my submitted evaluation, so that I can make changes before it is approved.
+
+**Acceptance Criteria:**
+
+* **AC-COLLAB-004.1:** When a Manager unlocks their own In Review evaluation, the system shall transition the evaluation back to Draft.
+* **AC-COLLAB-004.2:** When an evaluation is Approved, the system shall prevent Managers from unlocking it.
+* **AC-COLLAB-004.3:** When a Manager attempts to unlock another Manager's evaluation, the system shall deny the action.
+
 ## Feature Behavior & Rules
 
-The evaluation workflow follows a linear progression: Draft → In Review → Approved. A Manager can only submit an evaluation that is in Draft state. Only a VP can approve an evaluation or return it to Draft. An Approved evaluation is locked — no edits are permitted by any role. If an Approved evaluation requires revision, a VP must return it to Draft first. The Admin role has no participation in the evaluation workflow.
+The evaluation workflow is Draft → In Review → Approved. A Manager can only submit a Draft evaluation they own. A Manager can unlock only their own In Review evaluation. Only a VP can approve or return an In Review evaluation. An Approved evaluation is locked — no edits, unlocks, returns, or approvals are permitted.
 
 ## Export & Import
 
@@ -271,6 +287,27 @@ The Export & Import feature allows evaluation data to be moved in and out of the
 * **AC-EXPORT-002.1:** When a Manager exports an evaluation as PDF, the system shall generate a PDF file containing all evaluation fields and their values.
 * **AC-EXPORT-002.2:** When generating the PDF export, the system shall include the same evaluation content as the Markdown export in a readable printable layout.
 
+### REQ-EXPORT-003: Export Evaluation as JSON
+
+**User Story:** As a Manager, I want to export an evaluation as JSON, so that I can preserve or transfer structured evaluation data.
+
+**Acceptance Criteria:**
+
+* **AC-EXPORT-003.1:** When a user exports an evaluation as JSON, the system shall include the evaluation data in the schema accepted by JSON import.
+* **AC-EXPORT-003.2:** When a Manager exports JSON, the system shall allow export only for evaluations they own.
+* **AC-EXPORT-003.3:** When a VP exports JSON, the system shall allow export only for evaluations they are permitted to view.
+
+### REQ-EXPORT-004: Import Evaluation as JSON
+
+**User Story:** As a Manager, I want to import an evaluation from JSON, so that I can migrate or reuse structured evaluation data.
+
+**Acceptance Criteria:**
+
+* **AC-EXPORT-004.1:** When a Manager imports valid JSON, the system shall create a new Draft evaluation.
+* **AC-EXPORT-004.2:** When importing JSON, the system shall never overwrite an existing evaluation.
+* **AC-EXPORT-004.3:** When importing JSON, the system shall require the selected Employee to be actively assigned to the importing Manager.
+* **AC-EXPORT-004.4:** When importing malformed JSON or schema-invalid data, the system shall reject the import and show a validation error.
+
 ## Feature Behavior & Rules
 
-Export is available on any evaluation regardless of its current workflow state. Import always creates a new Draft evaluation — it never overwrites an existing record. The Markdown export format corresponds to the University of Waterloo co-op evaluation portal structure. PDF export provides a printable copy with the same evaluation content. JSON export and import use the same schema, ensuring that a file exported from this platform can be re-imported without modification.
+Export is available on any viewable evaluation regardless of workflow state. Export never changes workflow state. The Markdown export format corresponds to the University of Waterloo co-op evaluation portal structure. PDF export provides a printable copy with the same evaluation content. JSON export and import use a versioned schema, ensuring that a file exported from this platform can be re-imported without modification.
