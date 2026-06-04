@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Employee, Evaluation, EvaluationTemplate, ManagerAssignment
@@ -66,6 +66,14 @@ class BaseAppTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"status": "ok"})
+
+    @override_settings(DEBUG=False)
+    def test_static_files_are_served_without_debug(self):
+        response = self.client.get("/static/app/styles.css")
+
+        self.assertEqual(response.status_code, 200)
+        content = b"".join(response.streaming_content).decode()
+        self.assertIn("color-scheme: light", content)
 
     def test_dashboard_requires_login(self):
         response = self.client.get(reverse("dashboard"))

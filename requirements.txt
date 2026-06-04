@@ -7,4 +7,3 @@ pillow==12.2.0
 python-dotenv==1.2.2
 reportlab==4.5.1
 sqlparse==0.5.5
-whitenoise==6.12.0

@@ -1,0 +1,12 @@
+<a class="button-link secondary-link download-link" href="{% url 'export_evaluation_markdown' evaluation.id %}" aria-label="Download Markdown" title="Download Markdown">
+  <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/>
+  </svg>
+  <span>MD</span>
+</a>
+<a class="button-link secondary-link download-link" href="{% url 'export_evaluation_pdf' evaluation.id %}" aria-label="Download PDF" title="Download PDF">
+  <svg class="button-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"/>
+  </svg>
+  <span>PDF</span>
+</a>

@@ -29,8 +29,7 @@
               {% else %}
                 <a class="button-link secondary-link" href="{% url 'preview_evaluation' evaluation.id %}">View eval</a>
               {% endif %}
-              <a class="button-link secondary-link" href="{% url 'export_evaluation_markdown' evaluation.id %}">MD</a>
-              <a class="button-link secondary-link" href="{% url 'export_evaluation_pdf' evaluation.id %}">PDF</a>
+              {% include "app/export_links.html" %}
             </div>
           </td>
         </tr>

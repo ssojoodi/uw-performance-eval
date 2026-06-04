@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.contrib.staticfiles.views import serve as serve_static
 from django.urls import path
+from django.urls import re_path
 
 from app import views
 
@@ -14,6 +16,11 @@ urlpatterns = [
     ),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("health/", views.health, name="health"),
+    re_path(
+        r"^static/(?P<path>.*)$",
+        serve_static,
+        {"insecure": True},
+    ),
     path(
         "employees/<int:employee_id>/evaluations/start/",
         views.start_evaluation,

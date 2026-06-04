@@ -44,4 +44,4 @@ WEB_PORT=8000
 ```
 
 Mount `data/` on durable storage and back it up. The container runs migrations
-on startup and collects static files at image build time.
+on startup and serves packaged static files through Django.

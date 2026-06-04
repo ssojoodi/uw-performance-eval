@@ -126,8 +126,9 @@ SQLite is the v1 database. Store it on durable mounted storage and run one app
 instance while using SQLite.
 
 Docker Compose owns the deployment path. The web container runs migrations on
-startup, static files are collected at image build time, and production HTTPS
-deployments must set secure session and CSRF cookie flags.
+startup, and Django serves packaged static files through `staticfiles` in both
+local and Docker runs. Production HTTPS deployments must set secure session and
+CSRF cookie flags.
 
 Use PostgreSQL if write contention, horizontal scaling, or managed availability
 becomes necessary.
