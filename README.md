@@ -28,9 +28,20 @@ The SQLite database is stored under `data/`.
 
 ## Deploy To Production
 
-Use Docker Compose with one web container while SQLite is the backend.
+Use Docker Compose with one web container while SQLite is the backend. Publish
+the container on a localhost-only port, then proxy your public subdomain to that
+port from the host nginx.
 
-Production environment should set:
+On the server, copy `example.env` to `.env`, edit the values for the deployment,
+then start Compose. Docker Compose reads `.env` automatically from the directory
+containing `compose.yaml`.
+
+```bash
+cp example.env .env
+docker compose up -d --build
+```
+
+Production `.env` should set:
 
 ```env
 SECRET_KEY=...
@@ -40,7 +51,7 @@ CSRF_TRUSTED_ORIGINS=https://your-domain.example
 SESSION_COOKIE_SECURE=true
 CSRF_COOKIE_SECURE=true
 SQLITE_PATH=data/db.sqlite3
-WEB_PORT=8000
+WEB_PORT=8084
 ```
 
 Mount `data/` on durable storage and back it up. The container runs migrations
