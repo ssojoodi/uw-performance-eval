@@ -6,6 +6,9 @@
   <section class="page-head">
     <p class="eyebrow">{{ evaluation.template.name }}</p>
     <h1>{{ evaluation.employee.name }}</h1>
+    <div class="actions left-actions">
+      {% include "app/export_links.html" %}
+    </div>
   </section>
 
   <form method="post" class="eval-form">

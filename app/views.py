@@ -1,8 +1,10 @@
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.text import slugify
 
+from .exports import render_evaluation_markdown, render_evaluation_pdf
 from .forms import EvaluationForm
 from .models import Evaluation, EvaluationTemplate, ManagerAssignment
 from .roles import is_manager, is_vp, manager_required, vp_required
@@ -17,6 +19,31 @@ def health(request):
 
 def paginate(request, queryset):
     return Paginator(queryset, PAGE_SIZE).get_page(request.GET.get("page"))
+
+
+def get_viewable_evaluation_or_404(user, evaluation_id):
+    queryset = Evaluation.objects.select_related(
+        "employee",
+        "manager",
+        "template",
+        "approved_by",
+        "returned_by",
+    )
+    if is_manager(user):
+        return get_object_or_404(queryset, id=evaluation_id, manager=user)
+    if is_vp(user):
+        return get_object_or_404(
+            queryset,
+            id=evaluation_id,
+            state__in=[Evaluation.State.IN_REVIEW, Evaluation.State.APPROVED],
+        )
+    return get_object_or_404(queryset.none(), id=evaluation_id)
+
+
+def export_filename(evaluation, extension):
+    employee = slugify(evaluation.employee.name) or "employee"
+    template = slugify(evaluation.template.slug) or "evaluation"
+    return f"{employee}-{template}-{evaluation.id}.{extension}"
 
 
 @login_required
@@ -235,3 +262,29 @@ def return_evaluation(request, evaluation_id):
     evaluation.save()
 
     return redirect("dashboard")
+
+
+@login_required
+def export_evaluation_markdown(request, evaluation_id):
+    evaluation = get_viewable_evaluation_or_404(request.user, evaluation_id)
+    response = HttpResponse(
+        render_evaluation_markdown(evaluation),
+        content_type="text/markdown; charset=utf-8",
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="{export_filename(evaluation, "md")}"'
+    )
+    return response
+
+
+@login_required
+def export_evaluation_pdf(request, evaluation_id):
+    evaluation = get_viewable_evaluation_or_404(request.user, evaluation_id)
+    response = HttpResponse(
+        render_evaluation_pdf(evaluation),
+        content_type="application/pdf",
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="{export_filename(evaluation, "pdf")}"'
+    )
+    return response
