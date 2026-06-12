@@ -3,7 +3,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+      - "${WEB_PORT:-8000}:8000"
     environment:
       SECRET_KEY: "${SECRET_KEY:-dev-only-secret-key-change-me}"
       DEBUG: "${DEBUG:-false}"
