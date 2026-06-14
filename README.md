@@ -56,3 +56,19 @@ WEB_PORT=8084
 
 Mount `data/` on durable storage and back it up. The container runs migrations
 on startup and serves packaged static files through Django.
+
+### Create Initial Accounts
+
+Create a Django superuser after the first deployment:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+Use that account only for technical administration at `/admin/`. In Django
+admin, create product users under **Users** and assign each active product user
+to exactly one group: `VP`, `Manager`, or `Employee`.
+
+For v1, Employees are evaluation subjects and do not log in. Create student
+records under **Employees**, then use **Manager assignments** to assign active
+Employees to Manager users.
