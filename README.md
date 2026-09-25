@@ -28,9 +28,20 @@ The SQLite database is stored under `data/`.
 
 ## Deploy To Production
 
-Use Docker Compose with one web container while SQLite is the backend.
+Use Docker Compose with one web container while SQLite is the backend. Publish
+the container on a localhost-only port, then proxy your public subdomain to that
+port from the host nginx.
 
-Production environment should set:
+On the server, copy `example.env` to `.env`, edit the values for the deployment,
+then start Compose. Docker Compose reads `.env` automatically from the directory
+containing `compose.yaml`.
+
+```bash
+cp example.env .env
+docker compose up -d --build
+```
+
+Production `.env` should set:
 
 ```env
 SECRET_KEY=...
@@ -40,8 +51,24 @@ CSRF_TRUSTED_ORIGINS=https://your-domain.example
 SESSION_COOKIE_SECURE=true
 CSRF_COOKIE_SECURE=true
 SQLITE_PATH=data/db.sqlite3
-WEB_PORT=8000
+WEB_PORT=8084
 ```
 
 Mount `data/` on durable storage and back it up. The container runs migrations
 on startup and serves packaged static files through Django.
+
+### Create Initial Accounts
+
+Create a Django superuser after the first deployment:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+Use that account only for technical administration at `/admin/`. In Django
+admin, create product users under **Users** and assign each active product user
+to exactly one group: `VP`, `Manager`, or `Employee`.
+
+For v1, Employees are evaluation subjects and do not log in. Create student
+records under **Employees**, then use **Manager assignments** to assign active
+Employees to Manager users.
